@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 
 
 def get_default_app_dir() -> Path:
-    """Returns platform-specific application support directory."""
+    """Returns platform-specific application support directory, with fallback to local app_data."""
     if sys.platform == "win32":
         base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
     elif sys.platform == "darwin":
@@ -16,8 +16,14 @@ def get_default_app_dir() -> Path:
         base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
     
     app_dir = Path(base) / "Scraper"
-    app_dir.mkdir(parents=True, exist_ok=True)
-    return app_dir
+    try:
+        app_dir.mkdir(parents=True, exist_ok=True)
+        return app_dir
+    except (PermissionError, OSError):
+        # Fallback to local directory inside workspace
+        fallback = Path(__file__).resolve().parent.parent.parent / "app_data"
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
 
 
 @dataclass
