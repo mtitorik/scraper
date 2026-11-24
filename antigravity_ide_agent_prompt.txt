@@ -1,0 +1,78 @@
+Build a complete, production-ready standalone cross-platform desktop/web application named **"Scraper"** for **macOS and Windows**, designed for **Evolution Gadget** (`https://evolutiongadget.tech`) employees to run locally with user-adjustable CPU and RAM limits and an **always-visible Incognito browser**.
+
+---
+
+### 1. CORE APP IDENTITY, VISIBLE MODE & RESOURCE LIMITER
+- **App Name:** `Scraper`
+- **Platforms:** Standalone application for both **macOS** and **Windows** (include PyInstaller/packaging setup and local web/desktop UI via Streamlit, NiceGUI, or PyWebView so non-technical employees can launch **Scraper** easily without using a terminal).
+- **Always-Visible Incognito Browser:**
+  - Playwright MUST always launch in **Visible Mode (`headless=False`)** using a fresh **Incognito browser context** (`browser.new_context()`), so the user can visually watch **Scraper** search, navigate, and click variants in real time.
+- **Interactive CPU & RAM Limiter (Built into UI using `psutil`):**
+  - **CPU Core Limit Control:** Numeric input / slider allowing the user to select how many CPU cores **Scraper** can utilize (default: `2` or `3` cores). Enforce via worker/concurrency limits and `psutil` CPU affinity where supported by the OS (Windows/Linux), plus thread/process pool caps on macOS.
+  - **CPU Usage % Cap Control:** Slider / input allowing the user to set a max CPU usage percentage (e.g., `20%` to `80%`, default `40%`). Implement a lightweight background resource monitor (`psutil`) tracking both the Python process and spawned Playwright browser child processes; when CPU usage exceeds the user's cap, dynamically inject brief adaptive sleep delays between browser actions.
+  - **RAM Limit Control (GB / MB):** Slider / input allowing the user to set a maximum RAM ceiling (e.g., `1.0 GB` to `8.0 GB`, default `2.0 GB`). Monitor combined Python + browser RSS memory via `psutil`; when memory usage approaches the user's limit (e.g., >85% of the cap), cleanly close and recreate the Incognito browser context between products to flush accumulated browser memory.
+
+---
+
+### 2. USER INTERFACE, CONTROLS & INPUTS ("SCRAPER")
+Provide a clean, user-friendly interface in **Scraper** containing:
+1. **Input `.xlsx` File Picker:** Select/upload the source `.xlsx` spreadsheet containing product names (e.g., `Product Name` column).
+2. **New Output `.xlsx` File Path:** Choose the destination path for a **new `.xlsx` file** (never overwrite the original input `.xlsx` file; write and save progress incrementally after each product).
+3. **Root Image Folder Picker:** Choose the local root folder where **Scraper** creates a dedicated subfolder per product (`[Root Folder]/[Sanitized Product Name]/`).
+4. **Ordered Website Links (Hierarchy):** 4 ordered input fields for website homepage URLs (`Website 1` -> `Website 2` -> `Website 3` -> `Website 4`).
+5. **Resource Limiter Panel:** Live meters showing current CPU % and RAM usage alongside the user controls for **Max CPU Cores**, **Max CPU Usage %**, and **Max RAM Limit**.
+6. **Playback Controls:**
+   - **Start Button:** Starts the scraping workflow.
+   - **Pause / Resume Button:** Toggles a thread-safe/async pause state (`Event`) at clean checkpoints between variant clicks or products, keeping the visible Incognito browser open and current progress intact until **Resume** is clicked.
+   - **Stop Button:** Gracefully stops execution, closes the browser, and saves all completed rows to the new `.xlsx` file.
+7. **Brand & Gemini Settings Panel (Saved Locally):**
+   - Website Name: `Evolution Gadget`
+   - Website URL: `https://evolutiongadget.tech`
+   - Store Address: *(Editable field)*
+   - Selling Points to Highlight: *(Editable multi-line field)*
+   - Custom Gemini Rules / Prompt Tweaks: *(Editable multi-line field)*
+
+---
+
+### 3. WATERFALL MULTI-WEBSITE SEARCH & VARIANT SCRAPING
+1. **Hierarchical Fallback Order:**
+   - **Pass 1 (Website 1):** Search Website 1 for all products. Extract data, download images, run Gemini, and save to the new `.xlsx`. If zero exact matches are found, skip the product for now.
+   - **Pass 2 (Website 2):** Search Website 2 **only** for products skipped in Pass 1.
+   - **Pass 3 & 4 (Website 3 & Website 4):** Repeat in priority order for remaining unmatched products.
+   - **After Final Link:** Any product not found on any site gets `"not found"` in its fields and `Status = "Not Found"` in the output `.xlsx`.
+2. **Search Matching & Official/Unofficial Detection:**
+   - Open the target homepage in the visible Incognito browser, enter the product name in the search bar, and filter out unrelated accessories unless explicitly part of the product name.
+   - Detect and extract **both** Official and Unofficial options whether they appear as **two separate product listings** on the search results page or as **variant buttons** inside a single product page.
+   - Classify `"Apple Authorized"` (or explicit `"Official"`) as **Official**, and `"Apple Unauthorized"` (or explicit `"Unofficial"`) as **Unofficial**. Ignore region labels (e.g., USA, SG, UAE, Global) for Official/Unofficial classification.
+3. **Variant Click-Loop (Including Out-of-Stock) & Image Naming:**
+   - Click through every color, storage capacity, and official/unofficial combination—including **out-of-stock** variants—waiting briefly for prices and images to update.
+   - Save high-resolution images inside `[Root Folder]/[Sanitized Product Name]/` named as:
+     `{Product_Name}_{Variant_Type}_{Storage}_{Color}.{ext}` (sanitized for Windows and macOS paths).
+
+---
+
+### 4. GOOGLE GEMINI AI CONTENT ENGINE
+Use the official `google-genai` Python SDK:
+1. **3-Case Content Logic:**
+   - **Raw description exists:** Rewrite it into clear, natural, human-sounding, user-friendly copy.
+   - **No raw description, specifications exist:** Generate a user-friendly description from the specifications.
+   - **Neither description nor specifications exist:** Use **Google Search Grounding** to research the product, generate a clean specifications table for `Specifications`, and write a user-friendly description for `Product Description`.
+2. **Strict Rules:**
+   - Never mention the scraped source website's name, address, phone number, or URL.
+   - Always use **Evolution Gadget** (`https://evolutiongadget.tech`), the configured store address, and the configured selling points.
+   - Follow all custom rules entered by the user in the UI.
+
+---
+
+### 5. NEW `.XLSX` OUTPUT STRUCTURE & MISSING FIELD RULE
+Write a **new `.xlsx` file** with one row per product:
+- **Base Columns:** `Product Name`, `Product Link` (include both URLs if Official and Unofficial are separate listings), `Official Price`, `Unofficial Price`, `Colors`, `Storage Options`, `Warranty`, `Specifications`, `Product Description`, `Status`.
+- **Side-by-Side Variant Columns:** Immediately to the right, create side-by-side column groups per variant:
+  `Variant 1 Type | Variant 1 Storage | Variant 1 Color | Variant 1 Price`
+  `Variant 2 Type | Variant 2 Storage | Variant 2 Color | Variant 2 Price` ... and so on.
+- **Missing Field Rule:** When a product is found, any missing or blank individual field/price must be set to `"not found"`.
+
+---
+
+### 6. DELIVERABLES
+Generate clean, modular Python source code, standalone packaging scripts/configurations for **macOS** and **Windows**, `requirements.txt`, and a step-by-step `README.md` explaining Gemini API key setup, Playwright browser installation, and building/running **Scraper**.

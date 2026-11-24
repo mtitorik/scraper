@@ -1,0 +1,356 @@
+import os
+import sys
+import asyncio
+from pathlib import Path
+from typing import List, Dict, Any, Optional, Callable
+
+from ..config.settings import AppSettings
+from ..models.product_models import ProductRecord, PricePair, OptionPriceEntry, VariantCombination
+from ..core.resource_guard import ResourceGuard
+from ..browser.browser_manager import BrowserManager
+from ..browser.popup_guard import PopupGuard
+from ..scraper.site_scraper import SiteScraper
+from ..media.image_downloader import ImageDownloader
+from ..ai.gemini_engine import GeminiEngine
+from ..excel.workbook_manager import WorkbookManager
+
+
+class ScraperOrchestrator:
+    """Coordinates the 6-stage pipeline:
+    Waterfall search loop across unlimited priority-ordered websites,
+    interactive pause/resume/stop, live Excel updates, Gemini AI processing,
+    and automatic RAM context recycling.
+    """
+
+    def __init__(
+        self,
+        settings: AppSettings,
+        on_log: Optional[Callable[[str], None]] = None,
+        on_progress: Optional[Callable[[Dict[str, Any]], None]] = None,
+        on_row_updated: Optional[Callable[[Dict[str, Any]], None]] = None,
+        on_captcha_alert: Optional[Callable[[str], None]] = None,
+        on_status_change: Optional[Callable[[str], None]] = None,
+    ):
+        self.settings = settings
+        self.on_log = on_log or (lambda m: print(f"[Orchestrator] {m}"))
+        self.on_progress = on_progress or (lambda p: None)
+        self.on_row_updated = on_row_updated or (lambda r: None)
+        self.on_captcha_alert = on_captcha_alert or (lambda u: None)
+        self.on_status_change = on_status_change or (lambda s: None)
+
+        self.resource_guard = ResourceGuard(
+            max_cores=settings.max_cpu_cores,
+            max_cpu_percent=settings.max_cpu_percent,
+            max_ram_gb=settings.max_ram_gb,
+        )
+        self.browser_manager = BrowserManager(
+            mode=settings.browser_mode,
+            custom_path=settings.custom_browser_path,
+        )
+        self.gemini_engine = GeminiEngine(settings)
+        self.image_downloader: Optional[ImageDownloader] = None
+        self.workbook_manager: Optional[WorkbookManager] = None
+
+        self.pause_event = asyncio.Event()
+        self.pause_event.set()  # set means running
+        self.stop_event = asyncio.Event()
+        self.captcha_event = asyncio.Event()
+        self.captcha_event.set()  # set means no active captcha
+
+        self.is_running = False
+        self.is_paused = False
+
+    def update_settings(self, settings: AppSettings):
+        self.settings = settings
+        self.resource_guard.update_limits(
+            max_cores=settings.max_cpu_cores,
+            max_cpu_percent=settings.max_cpu_percent,
+            max_ram_gb=settings.max_ram_gb,
+        )
+        self.gemini_engine.update_settings(settings)
+        if self.image_downloader and settings.root_image_folder:
+            self.image_downloader = ImageDownloader(settings.root_image_folder)
+
+    def pause(self):
+        """Thread-safe pause request."""
+        if self.is_running and not self.is_paused:
+            self.is_paused = True
+            self.pause_event.clear()
+            self.on_status_change("Paused")
+            self.on_log("Execution paused cleanly at checkpoint.")
+
+    def resume(self):
+        """Thread-safe resume request."""
+        if self.is_running and self.is_paused:
+            self.is_paused = False
+            self.pause_event.set()
+            self.on_status_change("Running")
+            self.on_log("Execution resumed.")
+
+    def stop(self):
+        """Thread-safe stop request."""
+        if self.is_running:
+            self.stop_event.set()
+            self.pause_event.set()  # unblock if paused
+            self.captcha_event.set()  # unblock if waiting for captcha
+            self.on_status_change("Stopping")
+            self.on_log("Stopping scraping queue...")
+
+    def resolve_captcha(self):
+        """Called when user confirms they solved the on-screen CAPTCHA."""
+        self.captcha_event.set()
+        self.on_log("User confirmed CAPTCHA verification. Continuing...")
+
+    def _is_row_complete(self, record: ProductRecord) -> bool:
+        """Determines if a product has all essential information so further websites can be skipped."""
+        has_price = record.default_price.regular is not None and record.default_price.regular > 0
+        has_specs = bool(record.specifications and record.specifications != "not found")
+        has_images = bool(record.image_folder and os.path.exists(record.image_folder))
+
+        if not (has_price and has_specs and has_images):
+            return False
+
+        # Option C check: if search_missing_official_unofficial_pair is enabled
+        if self.settings.search_missing_official_unofficial_pair:
+            # Check if this product has official/unofficial variants recorded
+            off_unoff_entries = record.attribute_options.get("official/unofficial", [])
+            has_official = any(e.label.lower() == "official" for e in off_unoff_entries)
+            has_unofficial = any(e.label.lower() == "unofficial" for e in off_unoff_entries)
+
+            # If it has only one of the pair, it is NOT complete yet
+            if (has_official and not has_unofficial) or (has_unofficial and not has_official):
+                return False
+
+        return True
+
+    async def run(
+        self,
+        input_xlsx_path: str,
+        output_xlsx_path: str,
+        root_image_folder: str,
+        resume_xlsx_path: Optional[str] = None,
+    ):
+        """Main scraping execution loop."""
+        self.is_running = True
+        self.is_paused = False
+        self.stop_event.clear()
+        self.pause_event.set()
+        self.captcha_event.set()
+        self.on_status_change("Running")
+
+        self.image_downloader = ImageDownloader(root_image_folder)
+        websites = [w.strip() for w in self.settings.websites if w.strip()]
+
+        if not websites:
+            self.on_log("Error: No website URLs configured. Please add at least one website.")
+            self.is_running = False
+            self.on_status_change("Idle")
+            return
+
+        try:
+            # Step 1: Initialize WorkbookManager
+            if resume_xlsx_path and os.path.exists(resume_xlsx_path):
+                self.on_log(f"Resuming from existing output file: {Path(resume_xlsx_path).name}")
+                self.workbook_manager = WorkbookManager.load_for_resume(resume_xlsx_path)
+                self.workbook_manager.output_path = Path(output_xlsx_path).resolve()
+            else:
+                self.on_log(f"Reading product names from input file: {Path(input_xlsx_path).name}")
+                product_names = WorkbookManager.read_input_product_names(input_xlsx_path)
+                self.workbook_manager = WorkbookManager(output_xlsx_path)
+                self.workbook_manager.initialize_from_input_names(product_names)
+
+            # Immediately save the initial workbook file so user can inspect it right away!
+            self.workbook_manager.save_workbook()
+            self.on_log(f"Output .xlsx created immediately at {Path(output_xlsx_path).name}")
+
+            # Notify initial state of all rows to UI
+            for rec in self.workbook_manager.get_all_records():
+                self.on_row_updated(rec.to_summary_dict())
+
+            records_to_process = [
+                rec for rec in self.workbook_manager.get_all_records()
+                if rec.status in ("Pending", "In Progress", "Partial")
+            ]
+            total_count = len(self.workbook_manager.get_all_records())
+            self.on_log(f"Total products: {total_count}. Pending to process: {len(records_to_process)}")
+
+            # Step 2: Start visible Incognito browser
+            self.on_log(f"Launching visible Incognito browser ({self.settings.browser_mode})...")
+            page = await self.browser_manager.start()
+
+            # Step 3: Iterate through products
+            completed_count = total_count - len(records_to_process)
+
+            for prod_idx, record in enumerate(records_to_process, start=1):
+                if self.stop_event.is_set():
+                    self.on_log("Stop requested. Exiting queue...")
+                    break
+
+                # Handle pause
+                if not self.pause_event.is_set():
+                    self.on_log(f"Paused before processing '{record.product_name}'...")
+                    await self.pause_event.wait()
+
+                # Handle resource throttling
+                await self.resource_guard.throttle_if_needed()
+
+                record.status = "In Progress"
+                self.workbook_manager.update_record(record)
+                self.on_row_updated(record.to_summary_dict())
+
+                self.on_progress({
+                    "current": prod_idx + completed_count,
+                    "total": total_count,
+                    "product_name": record.product_name,
+                    "site": websites[0] if websites else "",
+                    "stage": "Searching websites",
+                })
+                self.on_log(f"[{prod_idx + completed_count}/{total_count}] Processing '{record.product_name}'...")
+
+                product_found_anywhere = False
+
+                # Waterfall website search loop
+                for site_idx, site_url in enumerate(websites, start=1):
+                    if self.stop_event.is_set():
+                        break
+                    if not self.pause_event.is_set():
+                        await self.pause_event.wait()
+                    await self.resource_guard.throttle_if_needed()
+
+                    # Check if row is already complete
+                    if product_found_anywhere and self._is_row_complete(record):
+                        self.on_log(f"Row complete for '{record.product_name}'. Skipping remaining websites.")
+                        break
+
+                    self.on_progress({
+                        "current": prod_idx + completed_count,
+                        "total": total_count,
+                        "product_name": record.product_name,
+                        "site": site_url,
+                        "stage": f"Checking Site {site_idx}/{len(websites)}",
+                    })
+
+                    # Perform search on this website
+                    candidates = await SiteScraper.search_product(
+                        page=page,
+                        site_url=site_url,
+                        product_name=record.product_name,
+                        skip_preowned=self.settings.skip_preowned_devices,
+                    )
+
+                    # Check for human verification challenge
+                    if await PopupGuard.detect_human_verification(page):
+                        self.on_log(f"Human verification challenge detected on {site_url}! Pausing for user...")
+                        self.on_captcha_alert(site_url)
+                        self.captcha_event.clear()
+                        await self.captcha_event.wait()
+
+                    if not candidates:
+                        self.on_log(f"No match for '{record.product_name}' on {site_url}")
+                        continue
+
+                    product_found_anywhere = True
+                    record.scraped_sources.append(site_url)
+
+                    # Scrape matched candidate page(s) (handles separate Official/Unofficial listings)
+                    for cand in candidates:
+                        cand_url = cand["url"]
+                        self.on_log(f"Scraping product page: {cand_url}")
+                        record.add_page_link(cand_url)
+
+                        page_data = await SiteScraper.scrape_product_page(
+                            page=page,
+                            page_url=cand_url,
+                            target_product_name=record.product_name,
+                            source_website=site_url,
+                            pause_event=self.pause_event,
+                            stop_event=self.stop_event,
+                            throttle_callback=self.resource_guard.throttle_if_needed,
+                        )
+
+                        # Merge prices
+                        if page_data["default_price"].regular:
+                            if not record.default_price.regular or record.default_price.regular == 0:
+                                record.default_price = page_data["default_price"]
+
+                        # Merge attribute options
+                        for cat, entries in page_data["attribute_options"].items():
+                            if cat not in record.attribute_options:
+                                record.attribute_options[cat] = []
+                            for entry in entries:
+                                if not any(x.label == entry.label for x in record.attribute_options[cat]):
+                                    record.attribute_options[cat].append(entry)
+
+                        # Merge variant combinations for Sheet 2
+                        for combo in page_data["variant_combinations"]:
+                            record.variant_combinations.append(combo)
+
+                        # Merge specifications
+                        if page_data["specifications"] != "not found":
+                            if record.specifications == "not found":
+                                record.specifications = page_data["specifications"]
+                            else:
+                                record.specifications += f"\n\n{page_data['specifications']}"
+
+                        # Merge warranty
+                        if page_data["warranty"] and "Warranty" not in record.extra_fields:
+                            record.extra_fields["Warranty"] = page_data["warranty"]
+
+                        # Download and convert images
+                        if page_data["image_urls"]:
+                            folder, saved_imgs = self.image_downloader.download_product_images(
+                                product_name=record.product_name,
+                                image_urls=page_data["image_urls"],
+                            )
+                            record.image_folder = folder
+
+                        # Run Gemini AI processing
+                        clean_specs, clean_desc = await self.gemini_engine.process_product_content(
+                            product_name=record.product_name,
+                            raw_description=page_data["raw_description"],
+                            specifications=record.specifications,
+                            is_found=True,
+                        )
+                        record.specifications = clean_specs
+                        record.description_html = clean_desc
+
+                # End of waterfall for this product
+                if product_found_anywhere:
+                    record.status = "Done" if self._is_row_complete(record) else "Partial"
+                else:
+                    record.status = "Not Found"
+                    record.specifications = "not found"
+                    record.description_html = "not found"
+
+                # Update memory and incrementally save to Excel
+                self.workbook_manager.update_record(record)
+                self.workbook_manager.save_workbook()
+                self.on_row_updated(record.to_summary_dict())
+                self.on_log(f"Saved '{record.product_name}' -> Status: {record.status}")
+
+                # Check RAM ceiling and recycle browser context if needed
+                if self.resource_guard.should_recycle_browser():
+                    self.on_log("RAM ceiling reached (>85%). Recycling Incognito browser context...")
+                    page = await self.browser_manager.recycle_context()
+
+            # Finished all records
+            self.on_log("Scraping queue complete! All rows saved to Excel.")
+            self.on_progress({
+                "current": total_count,
+                "total": total_count,
+                "product_name": "Completed",
+                "site": "-",
+                "stage": "Finished",
+            })
+            self.on_status_change("Finished")
+
+        except Exception as e:
+            self.on_log(f"Critical execution error: {e}")
+            import traceback
+            traceback.print_exc()
+            self.on_status_change("Error")
+        finally:
+            self.is_running = False
+            self.is_paused = False
+            await self.browser_manager.stop()
+            self.on_log("Browser closed.")

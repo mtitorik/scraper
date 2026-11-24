@@ -1,0 +1,67 @@
+# END-TO-END SYSTEM ARCHITECTURE & LOGIC
+App Name: Scraper
+Target Stack: Python + Playwright (Visible Incognito Browser) + openpyxl/pandas (.xlsx) + Google Gemini API + psutil (Resource Limiter) + Local Web/Desktop UI (Standalone Mac & Windows App)
+
+---
+
+## 1. HOW "SCRAPER" WORKS (THE 6-STAGE PIPELINE)
+
+### Stage 1: Standalone Cross-Platform App ("Scraper") & Resource Guardrails
+- Packaged as a standalone app for **both macOS and Windows** so employees at **Evolution Gadget** (`https://evolutiongadget.tech`) can launch and operate it with zero coding or terminal commands.
+- **Interactive Resource Limiter (Built into the UI):**
+  - **CPU Core Limit Slider/Selector:** Lets the user choose how many CPU cores **Scraper** is allowed to use (defaulting to 2–3 cores). Enforced via worker/thread pool caps and OS process affinity (`psutil` on Windows/Linux, and worker/process throttling on macOS).
+  - **CPU Usage % Cap:** Lets the user set a target maximum CPU percentage (e.g., 30%–50%). A background monitor (`psutil`) checks process + browser child-process CPU usage and dynamically injects short micro-pauses between actions if usage exceeds the target threshold.
+  - **RAM Usage Limit (MB / GB):** Lets the user set a maximum memory ceiling (e.g., 1.5 GB or 2 GB). **Scraper** monitors total RAM used by Python and the browser; if memory approaches the cap, it automatically recycles/restarts the browser context between products to clear cached DOM/image memory without losing progress.
+
+### Stage 2: App Inputs & Live Execution Controls
+Inside **Scraper**, the user configures:
+1. **Input `.xlsx` File:** Excel file containing product names.
+2. **New Output `.xlsx` File Path:** Destination for the newly generated `.xlsx` file (never overwrites the original input file; saves after every product).
+3. **Root Image Folder:** Local folder on Mac or Windows where **Scraper** creates `[Root Folder]/[Sanitized Product Name]/`.
+4. **Ordered Website Links (Hierarchy):** 3–4 website homepage URLs entered in priority order (Link 1 -> Link 2 -> Link 3 -> Link 4).
+5. **Resource Controls:** Sliders/inputs for **Max CPU Cores**, **Max CPU Usage %**, and **Max RAM Limit (GB)**.
+6. **Playback Controls:**
+   - **Start:** Begins or restarts the scraping queue.
+   - **Pause / Resume:** Thread-safe pause event (`threading.Event` / `asyncio.Event`). Clicking **Pause** cleanly finishes the current atomic step, holds the visible Incognito browser open in place, saves progress, and waits until the user clicks **Resume**.
+   - **Stop:** Safely terminates the run, closes the browser, and preserves all rows saved so far.
+
+### Stage 3: Waterfall Multi-Website Search Loop
+**Scraper** processes the ordered website links sequentially:
+- **Pass 1 (Link 1):** Searches Link 1 for pending products. Found products are scraped, processed with Gemini, have images saved, and are written to the new `.xlsx` file. Products with zero exact matches are skipped for now.
+- **Pass 2 (Link 2):** Searches Link 2 **only** for products skipped in Pass 1.
+- **Pass 3 & 4 (Link 3 & Link 4):** Repeats in order for any remaining unmatched products.
+- **Final Pass:** Any product still not found across all links receives `"not found"` in its fields and is marked `"Not Found"` in the output `.xlsx`.
+
+### Stage 4: Always-Visible Incognito Browser & Variant Extraction
+- Launches Playwright in **Visible Mode (`headless=False`)** inside an **Incognito context** (`browser.new_context()`), so the user can watch every search, click, and page transition live on screen.
+- Navigates to the target homepage, searches the product name, and filters out unrelated accessories unless explicitly present in the product name.
+- Handles both **separate product listings** (e.g., separate Official and Unofficial product pages for the exact same model) and **in-page variant buttons**.
+- Clicks through every color, storage capacity, and official/unofficial option—including **out-of-stock** variants—waiting for prices and images to update.
+- Downloads high-resolution images into `[Root Folder]/[Product Name]/` named as:
+  `{Product_Name}_{Variant_Type}_{Storage}_{Color}.{ext}`
+
+### Stage 5: Google Gemini AI Content Engine
+- **Description Present:** Rewrites into clear, human, user-friendly copy.
+- **No Description, Specs Present:** Generates a user-friendly description from the specifications.
+- **Neither Description Nor Specs Present:** Uses **Google Search Grounding** via Gemini to look up the product, build clean specifications, and write a user-friendly description.
+- **Strict Rules:** Removes competitor store names, addresses, contact info, and URLs; uses **Evolution Gadget** (`https://evolutiongadget.tech`), your store address, and your selling points; follows custom user rules.
+
+### Stage 6: Structured Output `.xlsx` With Side-by-Side Columns
+Writes a **new `.xlsx` file** with one row per product:
+- Base columns: `Product Name`, `Product Link`, `Official Price`, `Unofficial Price`, `Colors`, `Storage Options`, `Warranty`, `Specifications`, `Product Description`, `Status`.
+- Side-by-side variant column groups to the right (`Variant 1 Type | Variant 1 Storage | Variant 1 Color | Variant 1 Price`, `Variant 2 ...`, etc.).
+- Any missing field on a found product is filled with `"not found"`.
+
+---
+
+## 2. WHY IT CAN FAIL (AND HOW "SCRAPER" PREVENTS IT)
+
+1. **Browser Memory Bloat Over 50–100 Products:**
+   - *Why it fails:* Chromium/Playwright caches heavy images and scripts in RAM across dozens of product pages, eventually slowing down or crashing if RAM is capped.
+   - *How we prevent it:* The RAM monitor checks total process tree memory (`psutil`) after each product; if RAM nears the user's configured limit, **Scraper** cleanly closes and reopens the Incognito context to free RAM before continuing.
+2. **macOS vs. Windows CPU Limiting Differences:**
+   - *Why it fails:* Windows and Linux allow hard CPU core pinning (`cpu_affinity`), whereas macOS does not expose per-process core pinning to standard user apps.
+   - *How we prevent it:* **Scraper** caps active worker threads/contexts to the chosen core count *and* uses `psutil` CPU percentage throttling (inserting adaptive pauses when CPU % crosses the user's limit), ensuring smooth performance on both macOS and Windows.
+3. **Pausing Mid-Click:**
+   - *Why it fails:* Killing or freezing a browser mid-network request can cause timeouts when resumed.
+   - *How we prevent it:* The **Pause** button checks a safe checkpoint between clicks/products, letting the active click finish before pausing cleanly.
