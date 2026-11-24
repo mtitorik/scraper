@@ -215,10 +215,12 @@ def matches_model_name(candidate_title: str, query: str) -> bool:
     if not has_q_pro and has_c_pro:
         return False
 
-    has_q_anc = bool(re.search(r"\banc\b", q_lower)) or "active noise cancellation" in q_lower
-    has_c_anc = bool(re.search(r"\banc\b", c_lower)) or "active noise cancellation" in c_lower
-    if not has_q_anc and has_c_anc:
-        return False
+    # Only enforce ANC vs non-ANC distinction for AirPods 4 (where Apple sells two separate SKUs)
+    if "airpods" in q_lower and re.search(r"\b4\b", q_lower):
+        has_q_anc = bool(re.search(r"\banc\b", q_lower)) or "active noise cancellation" in q_lower
+        has_c_anc = bool(re.search(r"\banc\b", c_lower)) or "active noise cancellation" in c_lower
+        if not has_q_anc and has_c_anc:
+            return False
 
     has_q_ultra = bool(re.search(r"\bultra\b", q_lower))
     has_c_ultra = bool(re.search(r"\bultra\b", c_lower))

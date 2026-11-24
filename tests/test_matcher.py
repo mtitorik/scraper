@@ -121,6 +121,13 @@ def test_joyroom_jr_oe2s_and_anker_r60i_nc_matching():
     assert is_accessory("Anker Soundcore R60i NC True Wireless Earbuds with Charging Case", q_anker) is False
     assert matches_model_name("Anker Soundcore R60i NC True Wireless Earbuds with Charging Case", q_anker) is True
 
+    # CMF by Nothing Buds Pro 2 (must match titles containing ANC / Hybrid ANC!)
+    q_cmf = "CMF by Nothing Buds Pro 2"
+    assert matches_model_name("Cmf by Nothing Buds Pro 2 ANC LDAC Audio Earbuds", q_cmf) is True
+    assert matches_model_name("CMF by Nothing Buds Pro 2 Hybrid ANC Wireless Earbuds", q_cmf) is True
+    assert is_accessory("CMF Buds Pro 2 Case Protector", q_cmf) is True
+    assert matches_model_name("CMF by Nothing Buds 2 Plus ANC TWS Earbuds", q_cmf) is False
+
 
 def test_candidate_scoring_ranks_exact_match_first():
     query = "Apple AirPods Pro 2"

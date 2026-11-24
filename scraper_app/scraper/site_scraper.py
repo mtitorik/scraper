@@ -397,9 +397,10 @@ class SiteScraper:
                     return lines.join("\n").trim();
                 };
 
-                // Layer 1: Broad CSS selectors (OpenCart, WooCommerce, Shopify, custom)
+                // Layer 1: Broad CSS selectors (OpenCart, WooCommerce, Shopify, Next.js/custom)
                 const selectors = [
                     "#tab-specification",
+                    "#tabSpecification",
                     "#specification",
                     "#specifications",
                     "#specs",
@@ -410,6 +411,7 @@ class SiteScraper:
                     ".specifications",
                     ".specification",
                     "[data-section*='spec' i]",
+                    "[id*='tabspec' i]",
                     "[id*='specification' i]",
                     "table.specs",
                 ];
@@ -482,16 +484,18 @@ class SiteScraper:
                     return (clone.innerText || "").replace(/\n{3,}/g, "\n\n").trim();
                 };
 
-                // Layer 1: Broad CSS selectors
+                // Layer 1: Broad CSS selectors (OpenCart, WooCommerce, Shopify, Next.js/camelCase)
                 const selectors = [
                     "#tab-description",
+                    "#tabDescription",
                     "#description",
                     ".woocommerce-Tabs-panel--description",
                     ".product-description",
                     ".product-detail-description",
                     ".product-overview",
                     "[data-section*='desc' i]",
-                    "[id*='product-desc' i]",
+                    "[id*='tabdesc' i]",
+                    "[id*='description' i]",
                     "[class*='product-desc' i]",
                     ".description",
                 ];
@@ -510,11 +514,11 @@ class SiteScraper:
                     if (txt.length > 40) return txt;
                 }
 
-                // Layer 3: Heading-anchored discovery (Tailwind / Next.js / React)
+                // Layer 3: Heading-anchored discovery (Tailwind / Next.js / React — singular & plural)
                 const headings = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5"));
                 for (const h of headings) {
                     const txt = (h.innerText || "").trim().toLowerCase();
-                    if (/^(description|product description|overview|about this item|product details|key features|highlights)$/.test(txt)) {
+                    if (/^(descriptions?|product descriptions?|overview|about this item|product details|key features|highlights)$/.test(txt)) {
                         const section = h.closest("section, [role='tabpanel'], .tab-pane") || h.parentElement;
                         if (section) {
                             const content = cleanText(section);
