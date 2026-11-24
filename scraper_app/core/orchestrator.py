@@ -125,10 +125,11 @@ class ScraperOrchestrator:
 
     async def run(
         self,
-        input_xlsx_path: str,
+        input_xlsx_path: Optional[str],
         output_xlsx_path: str,
         root_image_folder: str,
         resume_xlsx_path: Optional[str] = None,
+        manual_products: Optional[List[str]] = None,
     ):
         """Main scraping execution loop."""
         self.is_running = True
@@ -153,7 +154,17 @@ class ScraperOrchestrator:
                 self.on_log(f"Resuming from existing output file: {Path(resume_xlsx_path).name}")
                 self.workbook_manager = WorkbookManager.load_for_resume(resume_xlsx_path)
                 self.workbook_manager.output_path = Path(output_xlsx_path).resolve()
+            elif manual_products and len(manual_products) > 0:
+                clean_names = [p.strip() for p in manual_products if p.strip()]
+                self.on_log(f"Initializing {len(clean_names)} manual products into queue...")
+                self.workbook_manager = WorkbookManager(output_xlsx_path)
+                self.workbook_manager.initialize_from_input_names(clean_names)
             else:
+                if not input_xlsx_path or not os.path.exists(input_xlsx_path):
+                    self.on_log("Error: No valid input .xlsx file provided.")
+                    self.is_running = False
+                    self.on_status_change("Error")
+                    return
                 self.on_log(f"Reading product names from input file: {Path(input_xlsx_path).name}")
                 product_names = WorkbookManager.read_input_product_names(input_xlsx_path)
                 self.workbook_manager = WorkbookManager(output_xlsx_path)

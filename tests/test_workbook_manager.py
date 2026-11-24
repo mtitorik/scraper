@@ -144,3 +144,23 @@ def test_resume_from_existing_xlsx():
         assert resumed_manager.records["iPhone 16 Pro"].status == "Done"
         assert resumed_manager.records["iPhone 16 Pro"].default_price.regular == 135000
         assert resumed_manager.records["Samsung S24 Ultra"].status == "Pending"
+
+
+def test_manual_products_initialization_and_saving():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output_path = Path(tmpdir) / "manual_output.xlsx"
+        manager = WorkbookManager(str(output_path))
+        manual_list = ["iPhone 16 Pro", "AirPods 4", "MacBook Pro M3"]
+
+        manager.initialize_from_input_names(manual_list)
+        assert len(manager.records) == 3
+        for item in manual_list:
+            assert item in manager.records
+            assert manager.records[item].status == "Pending"
+
+        assert manager.save_workbook() is True
+        assert output_path.exists()
+
+        wb = openpyxl.load_workbook(str(output_path))
+        ws = wb[WorkbookManager.SHEET_PRODUCTS]
+        assert ws.max_row == 4  # Header + 3 manual products

@@ -1,6 +1,7 @@
 // State management
 let appSettings = {};
 let activeSheet = "sheet1";
+let inputMode = "file";
 let productsMap = new Map(); // product_name -> summary dict
 let variantsList = [];
 let isScrapingRunning = false;
@@ -35,6 +36,11 @@ const elements = {
   btnCaptchaDone: document.getElementById("btn-captcha-done"),
 
   // Pickers & inputs
+  btnModeFile: document.getElementById("btn-mode-file"),
+  btnModeManual: document.getElementById("btn-mode-manual"),
+  fileInputGroup: document.getElementById("file-input-group"),
+  manualInputGroup: document.getElementById("manual-input-group"),
+  manualProductsInput: document.getElementById("manual-products-input"),
   inputXlsxPath: document.getElementById("input-xlsx-path"),
   outputXlsxPath: document.getElementById("output-xlsx-path"),
   rootFolderPath: document.getElementById("root-folder-path"),
@@ -462,21 +468,63 @@ elements.btnOpenFolderTop.addEventListener("click", () => {
   if (folder) callApi("open_local_path", folder);
 });
 
+// Mode Switcher (File vs Manual)
+elements.btnModeFile.addEventListener("click", () => {
+  inputMode = "file";
+  elements.btnModeFile.classList.add("active");
+  elements.btnModeManual.classList.remove("active");
+  elements.fileInputGroup.classList.remove("hidden");
+  elements.manualInputGroup.classList.add("hidden");
+  saveCurrentSettings();
+});
+
+elements.btnModeManual.addEventListener("click", () => {
+  inputMode = "manual";
+  elements.btnModeManual.classList.add("active");
+  elements.btnModeFile.classList.remove("active");
+  elements.manualInputGroup.classList.remove("hidden");
+  elements.fileInputGroup.classList.add("hidden");
+  saveCurrentSettings();
+});
+
 // Playback Controls
 elements.btnStart.addEventListener("click", async () => {
   const inputPath = elements.inputXlsxPath.value;
-  const outputPath = elements.outputXlsxPath.value;
+  let outputPath = elements.outputXlsxPath.value;
   const rootFolder = elements.rootFolderPath.value;
   const resumePath = elements.resumeXlsxPath.value;
 
-  if (!inputPath && !resumePath) {
-    alert("Please select an Input .xlsx file (or pick a Resume .xlsx file) first!");
-    return;
+  let manualProducts = null;
+
+  if (inputMode === "manual") {
+    const rawText = (elements.manualProductsInput.value || "").trim();
+    manualProducts = rawText
+      .split(/[\n,]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (manualProducts.length === 0) {
+      alert("Please enter at least one product name to search!");
+      return;
+    }
+
+    if (!outputPath) {
+      outputPath = rootFolder
+        ? rootFolder.replace(/[\\/]+$/, "") + "/manual_scraper_output.xlsx"
+        : "manual_scraper_output.xlsx";
+      elements.outputXlsxPath.value = outputPath;
+    }
+  } else {
+    if (!inputPath && !resumePath) {
+      alert("Please select an Input .xlsx file (or switch to Manual Entry, or pick a Resume file)!");
+      return;
+    }
+    if (!outputPath) {
+      alert("Please choose a destination for the New Output .xlsx file!");
+      return;
+    }
   }
-  if (!outputPath) {
-    alert("Please choose a destination for the New Output .xlsx file!");
-    return;
-  }
+
   if (!rootFolder) {
     alert("Please select a Root Image Folder!");
     return;
@@ -485,8 +533,18 @@ elements.btnStart.addEventListener("click", async () => {
   saveCurrentSettings();
   productsMap.clear();
   renderSheet1();
-  addLogEntry("Starting scraper queue...", "info");
-  await callApi("start_scraping", inputPath, outputPath, rootFolder, resumePath || null);
+  addLogEntry(
+    `Starting scraper queue (${inputMode === "manual" ? `${manualProducts.length} manual products` : "file mode"})...`,
+    "info"
+  );
+  await callApi(
+    "start_scraping",
+    inputMode === "manual" ? null : inputPath,
+    outputPath,
+    rootFolder,
+    resumePath || null,
+    manualProducts
+  );
 });
 
 elements.btnPause.addEventListener("click", () => {
@@ -569,6 +627,8 @@ elements.btnClearLog.addEventListener("click", () => {
 
 // Save current form state to settings
 const saveCurrentSettings = () => {
+  appSettings.input_mode = inputMode;
+  appSettings.manual_products_text = elements.manualProductsInput.value;
   appSettings.root_image_folder = elements.rootFolderPath.value;
   appSettings.last_input_xlsx = elements.inputXlsxPath.value;
   appSettings.last_output_xlsx = elements.outputXlsxPath.value;
@@ -592,6 +652,7 @@ const saveCurrentSettings = () => {
 
 // Auto-save listeners on text inputs
 [
+  elements.manualProductsInput,
   elements.customBrowserPath,
   elements.chkMissingOfficialPair,
   elements.chkSkipPreowned,
@@ -611,6 +672,21 @@ const saveCurrentSettings = () => {
 // Load settings into UI
 const loadSettingsIntoUI = (s) => {
   appSettings = s || {};
+
+  inputMode = s.input_mode || "file";
+  if (inputMode === "manual") {
+    elements.btnModeManual.classList.add("active");
+    elements.btnModeFile.classList.remove("active");
+    elements.manualInputGroup.classList.remove("hidden");
+    elements.fileInputGroup.classList.add("hidden");
+  } else {
+    elements.btnModeFile.classList.add("active");
+    elements.btnModeManual.classList.remove("active");
+    elements.fileInputGroup.classList.remove("hidden");
+    elements.manualInputGroup.classList.add("hidden");
+  }
+  elements.manualProductsInput.value = s.manual_products_text || "";
+
   elements.inputXlsxPath.value = s.last_input_xlsx || "";
   elements.outputXlsxPath.value = s.last_output_xlsx || "";
   elements.rootFolderPath.value = s.root_image_folder || "";

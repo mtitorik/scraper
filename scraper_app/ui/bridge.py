@@ -142,7 +142,14 @@ class ScraperBridge:
         return {"products": products, "variants": variants}
 
     # --- Scraping Queue Controls ---
-    def start_scraping(self, input_path: str, output_path: str, root_folder: str, resume_path: Optional[str] = None):
+    def start_scraping(
+        self,
+        input_path: Optional[str],
+        output_path: str,
+        root_folder: str,
+        resume_path: Optional[str] = None,
+        manual_products: Optional[List[str]] = None,
+    ):
         if self.orchestrator and self.orchestrator.is_running:
             return False
 
@@ -166,6 +173,7 @@ class ScraperBridge:
                         output_xlsx_path=output_path,
                         root_image_folder=root_folder,
                         resume_xlsx_path=resume_path,
+                        manual_products=manual_products,
                     )
                 )
             except Exception as e:

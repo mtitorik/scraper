@@ -91,13 +91,27 @@
       <section class="tab-panel active" id="tab-run">
         <!-- Configuration Card -->
         <div class="card config-card">
+          <div class="input-mode-switcher">
+            <button class="mode-btn active" id="btn-mode-file" type="button">
+              <span>📁 Upload .xlsx File</span>
+            </button>
+            <button class="mode-btn" id="btn-mode-manual" type="button">
+              <span>✍️ Enter Products Manually</span>
+            </button>
+          </div>
+
           <div class="file-pickers-grid">
-            <div class="form-group">
+            <div class="form-group" id="file-input-group">
               <label>Input .xlsx File <small>(Product Names in Col A)</small></label>
               <div class="input-with-button">
                 <input type="text" id="input-xlsx-path" placeholder="Select source product list..." readonly>
                 <button class="btn btn-secondary" id="btn-browse-input">Browse...</button>
               </div>
+            </div>
+
+            <div class="form-group hidden" id="manual-input-group">
+              <label>Enter Product Names to Search <small>(One per line or separated by comma)</small></label>
+              <textarea id="manual-products-input" rows="2" placeholder="e.g.&#10;iPhone 16 Pro&#10;Samsung Galaxy S24 Ultra&#10;AirPods 4"></textarea>
             </div>
 
             <div class="form-group">

@@ -32,6 +32,8 @@ class AppSettings:
     websites: List[str] = field(default_factory=list)
     
     # Storage and file paths
+    input_mode: str = "file"  # "file" or "manual"
+    manual_products_text: str = ""
     root_image_folder: str = ""
     last_input_xlsx: str = ""
     last_output_xlsx: str = ""
