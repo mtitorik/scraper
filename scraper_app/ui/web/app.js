@@ -6,6 +6,7 @@ let productsMap = new Map(); // product_name -> summary dict
 let variantsList = [];
 let isScrapingRunning = false;
 let isScrapingPaused = false;
+let activeDrawerDetail = null;
 
 // Audio chime for CAPTCHA and completion
 const playAlertChime = () => {
@@ -16,31 +17,41 @@ const playAlertChime = () => {
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.type = "sine";
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15); // A5
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
     osc.start();
     osc.stop(ctx.currentTime + 0.5);
   } catch (e) {
-    // AudioContext might be blocked until user gesture
+    // Ignore audio context restriction
   }
 };
 
 // DOM Elements
 const elements = {
+  sidebarBrandSubtitle: document.getElementById("sidebar-brand-subtitle"),
+  navWebsitesCount: document.getElementById("nav-websites-count"),
   statusBadge: document.getElementById("status-badge"),
+  statusBadgeText: document.getElementById("status-badge-text"),
   statusDescription: document.getElementById("status-description"),
   captchaBanner: document.getElementById("captcha-banner"),
   captchaSiteText: document.getElementById("captcha-site-text"),
   btnCaptchaDone: document.getElementById("btn-captcha-done"),
 
-  // Pickers & inputs
+  // Input mode & manual entry
   btnModeFile: document.getElementById("btn-mode-file"),
   btnModeManual: document.getElementById("btn-mode-manual"),
+  configModeHint: document.getElementById("config-mode-hint"),
   fileInputGroup: document.getElementById("file-input-group"),
   manualInputGroup: document.getElementById("manual-input-group"),
+  manualQuickInput: document.getElementById("manual-quick-input"),
+  btnManualQuickAdd: document.getElementById("btn-manual-quick-add"),
   manualProductsInput: document.getElementById("manual-products-input"),
+  manualProductCount: document.getElementById("manual-product-count"),
+  btnClearManual: document.getElementById("btn-clear-manual"),
+
+  // File pickers
   inputXlsxPath: document.getElementById("input-xlsx-path"),
   outputXlsxPath: document.getElementById("output-xlsx-path"),
   rootFolderPath: document.getElementById("root-folder-path"),
@@ -51,17 +62,21 @@ const elements = {
   btnBrowseResume: document.getElementById("btn-browse-resume"),
   btnClearResume: document.getElementById("btn-clear-resume"),
 
-  // Controls
+  // Playback controls
   btnStart: document.getElementById("btn-start"),
   btnPause: document.getElementById("btn-pause"),
   btnStop: document.getElementById("btn-stop"),
   btnOpenExcelTop: document.getElementById("btn-open-excel-top"),
   btnOpenFolderTop: document.getElementById("btn-open-folder-top"),
 
-  // Progress
+  // Progress & KPIs
   progressStatusLabel: document.getElementById("progress-status-label"),
   progressSiteLabel: document.getElementById("progress-site-label"),
   mainProgressBar: document.getElementById("main-progress-bar"),
+  kpiTotal: document.getElementById("kpi-total"),
+  kpiDone: document.getElementById("kpi-done"),
+  kpiNotFound: document.getElementById("kpi-not-found"),
+  kpiVariants: document.getElementById("kpi-variants"),
 
   // Tables
   tabSheet1: document.getElementById("tab-sheet-1"),
@@ -81,12 +96,19 @@ const elements = {
   chkSkipPreowned: document.getElementById("chk-skip-preowned"),
 
   // Browser & Resources
+  badgeChrome: document.getElementById("badge-chrome"),
+  badgeMsedge: document.getElementById("badge-msedge"),
+  badgeBrave: document.getElementById("badge-brave"),
   selBrowserMode: document.getElementById("sel-browser-mode"),
   customBrowserGroup: document.getElementById("custom-browser-group"),
   customBrowserPath: document.getElementById("custom-browser-path"),
   btnInstallChromium: document.getElementById("btn-install-chromium"),
   installProgressBox: document.getElementById("install-progress-box"),
   installLog: document.getElementById("install-log"),
+  gaugeCpuText: document.getElementById("gauge-cpu-text"),
+  gaugeCpuBar: document.getElementById("gauge-cpu-bar"),
+  gaugeRamText: document.getElementById("gauge-ram-text"),
+  gaugeRamBar: document.getElementById("gauge-ram-bar"),
   rangeCpuCores: document.getElementById("range-cpu-cores"),
   rangeCpuPercent: document.getElementById("range-cpu-percent"),
   rangeRamGb: document.getElementById("range-ram-gb"),
@@ -96,10 +118,13 @@ const elements = {
 
   // Gemini & Brand
   chkEnableGemini: document.getElementById("chk-enable-gemini"),
+  geminiSettingsContainer: document.getElementById("gemini-settings-container"),
+  btnOpenAiStudio: document.getElementById("btn-open-aistudio"),
   geminiApiKey: document.getElementById("gemini-api-key"),
   btnToggleKeyVisibility: document.getElementById("btn-toggle-key-visibility"),
   selGeminiModel: document.getElementById("sel-gemini-model"),
   selStructurePreset: document.getElementById("sel-structure-preset"),
+  presetCardsGrid: document.getElementById("preset-cards-grid"),
   customStructureGroup: document.getElementById("custom-structure-group"),
   txtCustomStructure: document.getElementById("txt-custom-structure"),
   brandName: document.getElementById("brand-name"),
@@ -108,16 +133,39 @@ const elements = {
   sellingPoints: document.getElementById("selling-points"),
   customRules: document.getElementById("custom-rules"),
 
-  // Log & Mini Meter
+  // Log & Sidebar Footer
   logTerminal: document.getElementById("log-terminal"),
   btnCopyLog: document.getElementById("btn-copy-log"),
   btnClearLog: document.getElementById("btn-clear-log"),
   miniCpu: document.getElementById("mini-cpu"),
   miniRam: document.getElementById("mini-ram"),
   miniRamBar: document.getElementById("mini-ram-bar"),
-  btnThemeToggle: document.getElementById("btn-theme-toggle"),
-  themeIcon: document.getElementById("theme-icon"),
-  themeLabel: document.getElementById("theme-label"),
+  btnThemeDark: document.getElementById("btn-theme-dark"),
+  btnThemeLight: document.getElementById("btn-theme-light"),
+
+  // Product Inspector Drawer
+  drawerBackdrop: document.getElementById("drawer-backdrop"),
+  productDrawer: document.getElementById("product-drawer"),
+  btnCloseDrawer: document.getElementById("btn-close-drawer"),
+  drawerProductName: document.getElementById("drawer-product-name"),
+  drawerMeta: document.getElementById("drawer-meta"),
+  drawerQuickActions: document.getElementById("drawer-quick-actions"),
+  btnDescRendered: document.getElementById("btn-desc-rendered"),
+  btnDescRaw: document.getElementById("btn-desc-raw"),
+  btnCopyDescHtml: document.getElementById("btn-copy-desc-html"),
+  drawerDescRendered: document.getElementById("drawer-desc-rendered"),
+  drawerDescRaw: document.getElementById("drawer-desc-raw"),
+  btnCopySpecs: document.getElementById("btn-copy-specs"),
+  drawerSpecsContent: document.getElementById("drawer-specs-content"),
+  drawerVariantsList: document.getElementById("drawer-variants-list"),
+
+  // Dialog & Toasts
+  confirmDialog: document.getElementById("confirm-dialog"),
+  confirmDialogTitle: document.getElementById("confirm-dialog-title"),
+  confirmDialogMessage: document.getElementById("confirm-dialog-message"),
+  btnConfirmCancel: document.getElementById("btn-confirm-cancel"),
+  btnConfirmOk: document.getElementById("btn-confirm-ok"),
+  toastContainer: document.getElementById("toast-container"),
 };
 
 // Safe API Call Helper
@@ -133,12 +181,93 @@ const callApi = async (fnName, ...args) => {
   return null;
 };
 
+// Toast Notifications (replaces native alert)
+const showToast = (message, type = "info") => {
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  elements.toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(6px)";
+    toast.style.transition = "all 0.2s ease";
+    setTimeout(() => toast.remove(), 220);
+  }, 3200);
+};
+
+// Native <dialog> Confirmation (replaces native confirm)
+const showConfirmDialog = (title, message) => {
+  return new Promise((resolve) => {
+    elements.confirmDialogTitle.textContent = title;
+    elements.confirmDialogMessage.textContent = message;
+
+    const cleanup = (val) => {
+      elements.btnConfirmCancel.onclick = null;
+      elements.btnConfirmOk.onclick = null;
+      if (elements.confirmDialog.open) elements.confirmDialog.close();
+      resolve(val);
+    };
+
+    elements.btnConfirmCancel.onclick = () => cleanup(false);
+    elements.btnConfirmOk.onclick = () => cleanup(true);
+    elements.confirmDialog.oncancel = () => cleanup(false);
+    elements.confirmDialog.showModal();
+  });
+};
+
+// HTML Escape & Safe Sanitizer for Rendered Preview
+const escapeHtml = (str) => {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+
+const sanitizeHtmlForPreview = (dirtyHtml) => {
+  const doc = new DOMParser().parseFromString(dirtyHtml || "", "text/html");
+  doc.querySelectorAll("script, style, iframe, object, embed").forEach((el) => el.remove());
+  doc.querySelectorAll("*").forEach((el) => {
+    for (const attr of Array.from(el.attributes)) {
+      if (attr.name.toLowerCase().startsWith("on") || attr.value.trim().toLowerCase().startsWith("javascript:")) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  });
+  return doc.body.innerHTML;
+};
+
+const formatUrlLabel = (url) => {
+  try {
+    const parsed = new URL(url);
+    const shortPath = parsed.pathname.length > 22 ? parsed.pathname.slice(0, 22) + "..." : parsed.pathname;
+    return `${parsed.hostname.replace(/^www\./, "")}${shortPath === "/" ? "" : shortPath}`;
+  } catch (e) {
+    return url;
+  }
+};
+
+// Global link/path openers
+window.openPath = (p, evt) => {
+  if (evt) evt.stopPropagation();
+  if (!p) return;
+  callApi("open_local_path", p);
+};
+
+window.openExternalUrl = (url, evt) => {
+  if (evt) evt.stopPropagation();
+  if (!url) return;
+  callApi("open_external_url", url);
+};
+
 // Log entry helper
 const addLogEntry = (msg, type = "info") => {
   const div = document.createElement("div");
   div.className = `log-entry ${type}`;
   const now = new Date().toLocaleTimeString();
-  div.innerText = `[${now}] ${msg}`;
+  div.textContent = `[${now}] ${msg}`;
   elements.logTerminal.appendChild(div);
   elements.logTerminal.scrollTop = elements.logTerminal.scrollHeight;
 };
@@ -162,9 +291,10 @@ window.onBackendEvent = (event) => {
 
     case "captcha_alert":
       elements.captchaBanner.classList.remove("hidden");
-      elements.captchaSiteText.innerText = `A verification challenge was detected on ${payload}. Please complete it in the browser!`;
+      elements.captchaSiteText.textContent = `A verification challenge was detected on ${payload}. Please verify manually in the visible browser window.`;
       playAlertChime();
-      addLogEntry(`⚠️ CAPTCHA Challenge detected on ${payload}. Paused for user verification.`, "warning");
+      addLogEntry(`CAPTCHA challenge detected on ${payload}. Paused for user verification.`, "warning");
+      showToast("Human verification required in the browser window", "warning");
       break;
 
     case "status_change":
@@ -173,12 +303,16 @@ window.onBackendEvent = (event) => {
 
     case "chromium_install_progress":
       elements.installProgressBox.classList.remove("hidden");
-      elements.installLog.innerText += payload + "\n";
+      elements.installLog.textContent += payload + "\n";
       elements.installProgressBox.scrollTop = elements.installProgressBox.scrollHeight;
       break;
 
     case "chromium_install_done":
-      addLogEntry(payload.success ? "Chromium installed successfully!" : "Chromium installation failed.");
+      showToast(
+        payload.success ? "Built-in Chromium installed successfully!" : "Chromium installation failed.",
+        payload.success ? "success" : "error"
+      );
+      addLogEntry(payload.success ? "Chromium installed successfully!" : "Chromium installation failed.", payload.success ? "success" : "error");
       break;
   }
 };
@@ -213,28 +347,113 @@ elements.tabSheet2.addEventListener("click", () => {
   renderSheet2();
 });
 
-// Theme Toggle
-elements.btnThemeToggle.addEventListener("click", () => {
-  const current = document.documentElement.getAttribute("data-theme") || "dark";
-  const next = current === "dark" ? "light" : "dark";
+// Theme Segmented Switcher
+const applyTheme = (theme, persist = true) => {
+  const next = theme === "light" ? "light" : "dark";
   document.documentElement.setAttribute("data-theme", next);
-  elements.themeIcon.innerText = next === "dark" ? "🌙" : "☀️";
-  elements.themeLabel.innerText = next === "dark" ? "Dark Theme" : "Light Theme";
-  appSettings.theme = next;
-  callApi("save_settings", appSettings);
+  elements.btnThemeDark.classList.toggle("active", next === "dark");
+  elements.btnThemeLight.classList.toggle("active", next === "light");
+  if (persist) {
+    appSettings.theme = next;
+    callApi("save_settings", appSettings);
+  }
+};
+
+elements.btnThemeDark.addEventListener("click", () => applyTheme("dark", true));
+elements.btnThemeLight.addEventListener("click", () => applyTheme("light", true));
+
+// Input Mode Switcher & Manual Product Counter
+const parseManualProducts = () => {
+  const rawText = (elements.manualProductsInput.value || "").trim();
+  if (!rawText) return [];
+  return rawText
+    .split(/[\n,]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+};
+
+const updateManualCountBadge = () => {
+  const count = parseManualProducts().length;
+  elements.manualProductCount.textContent = `${count} product${count === 1 ? "" : "s"} ready`;
+};
+
+const setInputMode = (mode, persist = true) => {
+  inputMode = mode === "manual" ? "manual" : "file";
+  const isManual = inputMode === "manual";
+  elements.btnModeManual.classList.toggle("active", isManual);
+  elements.btnModeFile.classList.toggle("active", !isManual);
+  elements.btnModeManual.setAttribute("aria-selected", String(isManual));
+  elements.btnModeFile.setAttribute("aria-selected", String(!isManual));
+  elements.manualInputGroup.classList.toggle("hidden", !isManual);
+  elements.fileInputGroup.classList.toggle("hidden", isManual);
+  elements.configModeHint.textContent = isManual
+    ? "Type or paste one product per line — no input .xlsx file needed"
+    : "Reads product names from Column A of your spreadsheet";
+  updateManualCountBadge();
+  if (persist) saveCurrentSettings();
+};
+
+elements.btnModeFile.addEventListener("click", () => setInputMode("file", true));
+elements.btnModeManual.addEventListener("click", () => setInputMode("manual", true));
+
+const appendQuickProduct = () => {
+  const val = (elements.manualQuickInput.value || "").trim();
+  if (!val) return;
+  const current = (elements.manualProductsInput.value || "").trim();
+  elements.manualProductsInput.value = current ? `${current}\n${val}` : val;
+  elements.manualQuickInput.value = "";
+  updateManualCountBadge();
+  saveCurrentSettings();
+};
+
+elements.btnManualQuickAdd.addEventListener("click", appendQuickProduct);
+elements.manualQuickInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    appendQuickProduct();
+  }
 });
 
-// Update Progress UI
-const updateProgressUI = ({ current, total, product_name, site, stage }) => {
+elements.manualProductsInput.addEventListener("input", updateManualCountBadge);
+
+elements.btnClearManual.addEventListener("click", () => {
+  elements.manualProductsInput.value = "";
+  elements.manualQuickInput.value = "";
+  updateManualCountBadge();
+  saveCurrentSettings();
+  showToast("Manual product list cleared", "info");
+});
+
+// Progress & KPIs
+const updateProgressUI = ({ current, total, product_name, stage }) => {
   const pct = total > 0 ? Math.round((current / total) * 100) : 0;
-  elements.progressStatusLabel.innerText = `${current} / ${total} Products (${pct}%)`;
-  elements.progressSiteLabel.innerText = product_name ? `${product_name} • ${stage}` : "-";
+  elements.progressStatusLabel.textContent = `${current} / ${total} Products (${pct}%)`;
+  elements.progressSiteLabel.textContent = product_name ? `${product_name} • ${stage}` : "Idle";
   elements.mainProgressBar.style.width = `${pct}%`;
+};
+
+const updateKpiStrip = () => {
+  const all = Array.from(productsMap.values());
+  let done = 0;
+  let notFound = 0;
+  let totalVariants = 0;
+
+  for (const r of all) {
+    if (r.status === "Done") done++;
+    else if (r.status === "Not Found") notFound++;
+    totalVariants += Number(r.variant_count || 0);
+  }
+
+  elements.kpiTotal.textContent = String(all.length);
+  elements.kpiDone.textContent = String(done);
+  elements.kpiNotFound.textContent = String(notFound);
+  elements.kpiVariants.textContent = String(totalVariants);
 };
 
 // Update Row in Table
 const updateRowInTable = (record) => {
   productsMap.set(record.product_name, record);
+  updateKpiStrip();
   if (activeSheet === "sheet1") {
     renderSheet1();
   }
@@ -247,34 +466,70 @@ const renderSheet1 = () => {
     r.product_name.toLowerCase().includes(filter)
   );
 
-  elements.tableRowCount.innerText = `${records.length} products`;
+  elements.tableRowCount.textContent = `${records.length} product${records.length === 1 ? "" : "s"}`;
 
   if (records.length === 0) {
-    elements.tbodySheet1.innerHTML =
-      '<tr><td colspan="8" class="empty-state">No matching products found.</td></tr>';
+    elements.tbodySheet1.innerHTML = `<tr>
+      <td colspan="8" class="empty-state-cell">
+        <div class="empty-state-box">
+          <div class="empty-state-icon" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+          </div>
+          <div class="empty-state-title">${productsMap.size === 0 ? "No products loaded yet" : "No matching products"}</div>
+          <div class="empty-state-steps">
+            <span>1. Upload .xlsx or enter products manually</span>
+            <span class="step-arrow">&rarr;</span>
+            <span>2. Add stores in Websites Waterfall</span>
+            <span class="step-arrow">&rarr;</span>
+            <span>3. Click Start Scraping</span>
+          </div>
+        </div>
+      </td>
+    </tr>`;
     return;
   }
 
+  const externalSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`;
+  const folderSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
+
   let html = "";
   for (const r of records) {
-    const statusCls = (r.status || "pending").toLowerCase().replace(" ", "-");
+    const statusCls = (r.status || "pending").toLowerCase().replace(/\s+/g, "-");
     const regPrice = r.default_price ? r.default_price.regular_display : "-";
     const discPrice = r.default_price ? r.default_price.discounted_display || "-" : "-";
-    const links = (r.page_links || []).join(", ") || "-";
+    const safeNameArg = escapeHtml(JSON.stringify(r.product_name));
 
     const folderCell = r.image_folder
-      ? `<button class="folder-link-btn" onclick="openPath('${r.image_folder.replace(/\\/g, "/")}')">Open Folder</button>`
-      : "-";
+      ? `<button class="cell-link-pill" type="button" onclick="openPath(${escapeHtml(JSON.stringify(r.image_folder))}, event)">${folderSvg}<span>Open Folder</span></button>`
+      : `<span class="desc-snippet">-</span>`;
 
-    html += `<tr>
+    const linksList = Array.isArray(r.page_links) ? r.page_links.filter(Boolean) : [];
+    const linkCell = linksList.length > 0
+      ? `<div class="cell-links-stack">${linksList.map((u) =>
+          `<button class="cell-link-pill" type="button" title="${escapeHtml(u)}" onclick="openExternalUrl(${escapeHtml(JSON.stringify(u))}, event)">${externalSvg}<span>${escapeHtml(formatUrlLabel(u))}</span></button>`
+        ).join("")}</div>`
+      : `<span class="desc-snippet">-</span>`;
+
+    const descPreview = r.description_preview && r.description_preview !== "not found"
+      ? r.description_preview
+      : (r.status === "Pending" ? "-" : "not found");
+
+    const descCell = descPreview !== "-" && descPreview !== "not found"
+      ? `<div class="desc-cell-wrap">
+           <span class="desc-snippet" title="${escapeHtml(descPreview)}">${escapeHtml(descPreview)}</span>
+           <button class="btn btn-secondary btn-xs" type="button" onclick="openProductDrawer(${safeNameArg}, event)">View</button>
+         </div>`
+      : `<span class="desc-snippet">${escapeHtml(descPreview)}</span>`;
+
+    html += `<tr class="clickable-row" onclick="openProductDrawer(${safeNameArg})">
       <td><strong>${escapeHtml(r.product_name)}</strong></td>
       <td><span class="status-cell ${statusCls}">${escapeHtml(r.status || "Pending")}</span></td>
-      <td>${escapeHtml(regPrice)}</td>
-      <td>${escapeHtml(discPrice)}</td>
+      <td><span class="price-val">${escapeHtml(regPrice)}</span></td>
+      <td><span class="price-val ${discPrice !== "-" ? "discount" : ""}">${escapeHtml(discPrice)}</span></td>
       <td>${folderCell}</td>
-      <td title="${escapeHtml(links)}" style="max-width: 180px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(links)}</td>
-      <td title="${escapeHtml(r.specifications || '')}" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(r.specifications || '-')}</td>
-      <td>${r.description_html_len ? `${r.description_html_len} chars` : "-"}</td>
+      <td>${linkCell}</td>
+      <td><span class="specs-snippet" title="${escapeHtml(r.specifications || "")}">${escapeHtml(r.specifications || "-")}</span></td>
+      <td>${descCell}</td>
     </tr>`;
   }
   elements.tbodySheet1.innerHTML = html;
@@ -290,85 +545,199 @@ const renderSheet2 = async () => {
 
   const filtered = variantsList.filter((v) =>
     (v["Product name"] || "").toLowerCase().includes(filter) ||
-    (v["Colour"] || "").toLowerCase().includes(filter)
+    (v["Colour"] || "").toLowerCase().includes(filter) ||
+    (v["Region"] || "").toLowerCase().includes(filter)
   );
 
-  elements.tableRowCount.innerText = `${filtered.length} variant rows`;
+  elements.tableRowCount.textContent = `${filtered.length} variant row${filtered.length === 1 ? "" : "s"}`;
 
   if (filtered.length === 0) {
-    elements.tbodySheet2.innerHTML =
-      '<tr><td colspan="10" class="empty-state">No variant combinations recorded yet.</td></tr>';
+    elements.tbodySheet2.innerHTML = `<tr>
+      <td colspan="10" class="empty-state-cell">
+        <div class="empty-state-box">
+          <div class="empty-state-title">No variant combinations captured yet</div>
+          <div class="empty-state-sub">Every clicked color, storage, region, and official/unofficial price will appear here live.</div>
+        </div>
+      </td>
+    </tr>`;
     return;
   }
 
+  const externalSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`;
+
   let html = "";
   for (const v of filtered) {
+    const pageUrl = v["Page Link"] || "";
+    const linkHtml = pageUrl && pageUrl.startsWith("http")
+      ? `<button class="cell-link-pill" type="button" title="${escapeHtml(pageUrl)}" onclick="openExternalUrl(${escapeHtml(JSON.stringify(pageUrl))}, event)">${externalSvg}<span>${escapeHtml(formatUrlLabel(pageUrl))}</span></button>`
+      : `<span class="desc-snippet">-</span>`;
+
     html += `<tr>
       <td><strong>${escapeHtml(v["Product name"] || "")}</strong></td>
-      <td>${escapeHtml(v["Source Website"] || "-")}</td>
+      <td>${escapeHtml(formatUrlLabel(v["Source Website"] || "-"))}</td>
       <td>${escapeHtml(v["Official/Unofficial"] || "-")}</td>
       <td>${escapeHtml(v["Region"] || "-")}</td>
       <td>${escapeHtml(v["Storage"] || "-")}</td>
       <td>${escapeHtml(v["Colour"] || "-")}</td>
-      <td>${escapeHtml(v["Regular Price"] || "-")}</td>
-      <td>${escapeHtml(v["Discounted Price"] || "-")}</td>
+      <td><span class="price-val">${escapeHtml(v["Regular Price"] || "-")}</span></td>
+      <td><span class="price-val discount">${escapeHtml(v["Discounted Price"] || "-")}</span></td>
       <td>${escapeHtml(v["Stock Status"] || "-")}</td>
-      <td title="${escapeHtml(v["Page Link"] || '')}" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(v["Page Link"] || '-')}</td>
+      <td>${linkHtml}</td>
     </tr>`;
   }
   elements.tbodySheet2.innerHTML = html;
 };
 
-const escapeHtml = (str) => {
-  if (!str) return "";
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+// Slide-Over Product Inspector Drawer
+window.openProductDrawer = async (productName, evt) => {
+  if (evt) evt.stopPropagation();
+  const detail = await callApi("get_product_detail", productName);
+  const summary = productsMap.get(productName);
+  activeDrawerDetail = detail || summary;
+  if (!activeDrawerDetail) return;
+
+  elements.drawerProductName.textContent = activeDrawerDetail.product_name || productName;
+
+  const statusCls = (activeDrawerDetail.status || "pending").toLowerCase().replace(/\s+/g, "-");
+  const regP = activeDrawerDetail.default_price ? activeDrawerDetail.default_price.regular_display : "not found";
+  const discP = activeDrawerDetail.default_price ? activeDrawerDetail.default_price.discounted_display : "";
+  elements.drawerMeta.innerHTML = `
+    <span class="status-cell ${statusCls}">${escapeHtml(activeDrawerDetail.status || "Pending")}</span>
+    <span class="count-pill">Regular: ${escapeHtml(regP)}</span>
+    ${discP ? `<span class="count-pill" style="background: var(--success-soft); color: var(--success);">Discounted: ${escapeHtml(discP)}</span>` : ""}
+  `;
+
+  // Quick action buttons
+  let actionsHtml = "";
+  const links = activeDrawerDetail.page_links || [];
+  links.forEach((u, idx) => {
+    actionsHtml += `<button class="btn btn-secondary btn-xs" type="button" onclick="openExternalUrl(${escapeHtml(JSON.stringify(u))}, event)">Open Page ${links.length > 1 ? idx + 1 : ""} &nearr;</button>`;
+  });
+  if (activeDrawerDetail.image_folder) {
+    actionsHtml += `<button class="btn btn-secondary btn-xs" type="button" onclick="openPath(${escapeHtml(JSON.stringify(activeDrawerDetail.image_folder))}, event)">Open Image Folder</button>`;
+  }
+  elements.drawerQuickActions.innerHTML = actionsHtml || `<span class="drawer-pane-hint">No external links or image folder yet.</span>`;
+
+  // Description pane
+  const rawDesc = activeDrawerDetail.description_html || activeDrawerDetail.description_preview || "not found";
+  elements.drawerDescRendered.innerHTML = rawDesc === "not found"
+    ? `<p style="color: var(--text-muted);">No description available for this product yet.</p>`
+    : sanitizeHtmlForPreview(rawDesc);
+  elements.drawerDescRaw.textContent = rawDesc;
+
+  // Specs pane
+  elements.drawerSpecsContent.textContent = activeDrawerDetail.specifications || "not found";
+
+  // Variants pane
+  const combos = activeDrawerDetail.variants || [];
+  if (combos.length === 0) {
+    elements.drawerVariantsList.innerHTML = `<div class="empty-state-sub">No variant combinations captured for this product yet.</div>`;
+  } else {
+    elements.drawerVariantsList.innerHTML = combos.map((v) => {
+      const attrs = [v["Official/Unofficial"], v["Region"], v["Storage"], v["Colour"]]
+        .filter((x) => x && x !== "not found" && x !== "-")
+        .join(" • ") || "Default Variant";
+      return `<div class="drawer-variant-card">
+        <div>
+          <strong>${escapeHtml(attrs)}</strong>
+          <div style="font-size: 11.5px; color: var(--text-muted);">${escapeHtml(v["Stock Status"] || "")}</div>
+        </div>
+        <div style="text-align: right;">
+          <div class="price-val">${escapeHtml(v["Regular Price"] || "not found")}</div>
+          ${v["Discounted Price"] && v["Discounted Price"] !== "-" ? `<div class="price-val discount" style="font-size: 11.5px;">${escapeHtml(v["Discounted Price"])}</div>` : ""}
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  elements.drawerBackdrop.classList.remove("hidden");
+  elements.productDrawer.classList.remove("hidden");
 };
 
-window.openPath = (p) => {
-  callApi("open_local_path", p);
+const closeProductDrawer = () => {
+  elements.drawerBackdrop.classList.add("hidden");
+  elements.productDrawer.classList.add("hidden");
 };
+
+elements.btnCloseDrawer.addEventListener("click", closeProductDrawer);
+elements.drawerBackdrop.addEventListener("click", closeProductDrawer);
+
+document.querySelectorAll(".drawer-tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".drawer-tab").forEach((t) => t.classList.remove("active"));
+    document.querySelectorAll(".drawer-pane").forEach((p) => p.classList.add("hidden"));
+    tab.classList.add("active");
+    const target = tab.getAttribute("data-drawer-tab");
+    document.getElementById(`drawer-pane-${target}`).classList.remove("hidden");
+  });
+});
+
+elements.btnDescRendered.addEventListener("click", () => {
+  elements.btnDescRendered.classList.add("active");
+  elements.btnDescRaw.classList.remove("active");
+  elements.drawerDescRendered.classList.remove("hidden");
+  elements.drawerDescRaw.classList.add("hidden");
+});
+
+elements.btnDescRaw.addEventListener("click", () => {
+  elements.btnDescRaw.classList.add("active");
+  elements.btnDescRendered.classList.remove("active");
+  elements.drawerDescRaw.classList.remove("hidden");
+  elements.drawerDescRendered.classList.add("hidden");
+});
+
+elements.btnCopyDescHtml.addEventListener("click", () => {
+  if (!activeDrawerDetail) return;
+  navigator.clipboard.writeText(activeDrawerDetail.description_html || "");
+  showToast("HTML description copied to clipboard", "success");
+});
+
+elements.btnCopySpecs.addEventListener("click", () => {
+  if (!activeDrawerDetail) return;
+  navigator.clipboard.writeText(activeDrawerDetail.specifications || "");
+  showToast("Specifications copied to clipboard", "success");
+});
 
 // App Status Updates
 const updateAppStatus = (status) => {
   elements.statusBadge.className = `status-pill ${status.toLowerCase()}`;
-  elements.statusBadge.innerText = status;
+  elements.statusBadgeText.textContent = status;
 
   if (status === "Running") {
     isScrapingRunning = true;
     isScrapingPaused = false;
     elements.btnStart.disabled = true;
     elements.btnPause.disabled = false;
-    elements.btnPause.innerText = "⏸ Pause";
+    elements.btnPause.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>Pause</span>`;
     elements.btnStop.disabled = false;
-    elements.statusDescription.innerText = "Scraping active in visible Incognito browser...";
+    elements.statusDescription.textContent = "Scraping active in visible Incognito browser...";
   } else if (status === "Paused") {
     isScrapingPaused = true;
-    elements.btnPause.innerText = "▶ Resume";
-    elements.statusDescription.innerText = "Paused cleanly at checkpoint.";
-  } else if (status === "Stopping" || status === "Finished" || status === "Idle" || status === "Error") {
+    elements.btnPause.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>Resume</span>`;
+    elements.statusDescription.textContent = "Paused cleanly at checkpoint.";
+  } else {
     isScrapingRunning = false;
     isScrapingPaused = false;
     elements.btnStart.disabled = false;
     elements.btnPause.disabled = true;
     elements.btnStop.disabled = true;
     elements.captchaBanner.classList.add("hidden");
-    elements.statusDescription.innerText = status === "Finished" ? "Scraping completed! All data saved." : "Ready to scrape";
-    if (status === "Finished") playAlertChime();
+    elements.statusDescription.textContent = status === "Finished" ? "Scraping complete — all rows saved." : "Ready to scrape";
+    if (status === "Finished") {
+      playAlertChime();
+      showToast("Scraping finished! All rows saved to Excel.", "success");
+    }
   }
 };
 
 // Website List Rendering
 const renderWebsites = () => {
   const websites = appSettings.websites || [];
+  elements.navWebsitesCount.textContent = String(websites.length);
   elements.websiteList.innerHTML = "";
 
   if (websites.length === 0) {
-    elements.websiteList.innerHTML = '<li class="empty-state">No websites added yet. Add URLs above to set the priority order!</li>';
+    elements.websiteList.innerHTML = '<li class="empty-state-sub" style="padding: 18px; text-align: center;">No websites added yet. Add store URLs above to set the waterfall priority order.</li>';
     return;
   }
 
@@ -381,9 +750,9 @@ const renderWebsites = () => {
         <strong>${escapeHtml(url)}</strong>
       </div>
       <div class="website-actions">
-        <button class="btn btn-secondary btn-sm" onclick="moveWebsite(${idx}, -1)" ${idx === 0 ? "disabled" : ""}>↑</button>
-        <button class="btn btn-secondary btn-sm" onclick="moveWebsite(${idx}, 1)" ${idx === websites.length - 1 ? "disabled" : ""}>↓</button>
-        <button class="btn btn-danger btn-sm" onclick="removeWebsite(${idx})">✕</button>
+        <button class="btn btn-secondary btn-xs" type="button" onclick="moveWebsite(${idx}, -1)" ${idx === 0 ? "disabled" : ""} title="Move up">&uarr;</button>
+        <button class="btn btn-secondary btn-xs" type="button" onclick="moveWebsite(${idx}, 1)" ${idx === websites.length - 1 ? "disabled" : ""} title="Move down">&darr;</button>
+        <button class="btn btn-ghost btn-xs" type="button" onclick="removeWebsite(${idx})" title="Remove website" style="color: var(--danger);">&times;</button>
       </div>
     `;
     elements.websiteList.appendChild(li);
@@ -394,9 +763,7 @@ window.moveWebsite = (idx, dir) => {
   const list = appSettings.websites;
   const target = idx + dir;
   if (target < 0 || target >= list.length) return;
-  const temp = list[idx];
-  list[idx] = list[target];
-  list[target] = temp;
+  [list[idx], list[target]] = [list[target], list[idx]];
   saveCurrentSettings();
   renderWebsites();
 };
@@ -407,16 +774,26 @@ window.removeWebsite = (idx) => {
   renderWebsites();
 };
 
-elements.btnAddWebsite.addEventListener("click", () => {
-  const url = (elements.newWebsiteUrl.value || "").trim();
+const addWebsiteFromInput = () => {
+  let url = (elements.newWebsiteUrl.value || "").trim();
   if (!url) return;
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
   if (!appSettings.websites) appSettings.websites = [];
   if (!appSettings.websites.includes(url)) {
     appSettings.websites.push(url);
     saveCurrentSettings();
     renderWebsites();
+    showToast(`Added ${formatUrlLabel(url)}`, "success");
   }
   elements.newWebsiteUrl.value = "";
+};
+
+elements.btnAddWebsite.addEventListener("click", addWebsiteFromInput);
+elements.newWebsiteUrl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    addWebsiteFromInput();
+  }
 });
 
 // File Browsing Event Handlers
@@ -440,9 +817,7 @@ elements.btnBrowseOutput.addEventListener("click", async () => {
 
 elements.btnBrowseResume.addEventListener("click", async () => {
   const path = await callApi("pick_resume_file");
-  if (path) {
-    elements.resumeXlsxPath.value = path;
-  }
+  if (path) elements.resumeXlsxPath.value = path;
 });
 
 elements.btnClearResume.addEventListener("click", () => {
@@ -460,31 +835,14 @@ elements.btnBrowseFolder.addEventListener("click", async () => {
 
 elements.btnOpenExcelTop.addEventListener("click", () => {
   const path = elements.outputXlsxPath.value || elements.resumeXlsxPath.value;
-  if (path) callApi("open_local_path", path);
+  if (!path) return showToast("No output .xlsx file selected yet", "warning");
+  callApi("open_local_path", path);
 });
 
 elements.btnOpenFolderTop.addEventListener("click", () => {
   const folder = elements.rootFolderPath.value;
-  if (folder) callApi("open_local_path", folder);
-});
-
-// Mode Switcher (File vs Manual)
-elements.btnModeFile.addEventListener("click", () => {
-  inputMode = "file";
-  elements.btnModeFile.classList.add("active");
-  elements.btnModeManual.classList.remove("active");
-  elements.fileInputGroup.classList.remove("hidden");
-  elements.manualInputGroup.classList.add("hidden");
-  saveCurrentSettings();
-});
-
-elements.btnModeManual.addEventListener("click", () => {
-  inputMode = "manual";
-  elements.btnModeManual.classList.add("active");
-  elements.btnModeFile.classList.remove("active");
-  elements.manualInputGroup.classList.remove("hidden");
-  elements.fileInputGroup.classList.add("hidden");
-  saveCurrentSettings();
+  if (!folder) return showToast("No root image folder selected yet", "warning");
+  callApi("open_local_path", folder);
 });
 
 // Playback Controls
@@ -497,17 +855,11 @@ elements.btnStart.addEventListener("click", async () => {
   let manualProducts = null;
 
   if (inputMode === "manual") {
-    const rawText = (elements.manualProductsInput.value || "").trim();
-    manualProducts = rawText
-      .split(/[\n,]/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-
+    manualProducts = parseManualProducts();
     if (manualProducts.length === 0) {
-      alert("Please enter at least one product name to search!");
+      showToast("Please enter at least one product name to search", "warning");
       return;
     }
-
     if (!outputPath) {
       outputPath = rootFolder
         ? rootFolder.replace(/[\\/]+$/, "") + "/manual_scraper_output.xlsx"
@@ -516,22 +868,28 @@ elements.btnStart.addEventListener("click", async () => {
     }
   } else {
     if (!inputPath && !resumePath) {
-      alert("Please select an Input .xlsx file (or switch to Manual Entry, or pick a Resume file)!");
+      showToast("Please select an Input .xlsx file or switch to Manual Entry", "warning");
       return;
     }
     if (!outputPath) {
-      alert("Please choose a destination for the New Output .xlsx file!");
+      showToast("Please choose a destination for the Output .xlsx file", "warning");
       return;
     }
   }
 
   if (!rootFolder) {
-    alert("Please select a Root Image Folder!");
+    showToast("Please select a Root Image Folder", "warning");
+    return;
+  }
+
+  if (!appSettings.websites || appSettings.websites.length === 0) {
+    showToast("Please add at least one website in Websites Waterfall first", "warning");
     return;
   }
 
   saveCurrentSettings();
   productsMap.clear();
+  updateKpiStrip();
   renderSheet1();
   addLogEntry(
     `Starting scraper queue (${inputMode === "manual" ? `${manualProducts.length} manual products` : "file mode"})...`,
@@ -548,17 +906,16 @@ elements.btnStart.addEventListener("click", async () => {
 });
 
 elements.btnPause.addEventListener("click", () => {
-  if (isScrapingPaused) {
-    callApi("resume_scraping");
-  } else {
-    callApi("pause_scraping");
-  }
+  if (isScrapingPaused) callApi("resume_scraping");
+  else callApi("pause_scraping");
 });
 
-elements.btnStop.addEventListener("click", () => {
-  if (confirm("Are you sure you want to stop scraping? All completed rows are preserved.")) {
-    callApi("stop_scraping");
-  }
+elements.btnStop.addEventListener("click", async () => {
+  const confirmed = await showConfirmDialog(
+    "Stop Scraping?",
+    "All completed rows and downloaded images are already saved to disk and can be resumed later."
+  );
+  if (confirmed) callApi("stop_scraping");
 });
 
 elements.btnCaptchaDone.addEventListener("click", () => {
@@ -566,21 +923,21 @@ elements.btnCaptchaDone.addEventListener("click", () => {
   callApi("verify_captcha_done");
 });
 
-// Sliders and Inputs Auto-Save
+// Sliders & Browser Controls
 elements.rangeCpuCores.addEventListener("input", (e) => {
-  elements.valCpuCores.innerText = `${e.target.value} cores`;
-  appSettings.max_cpu_cores = parseInt(e.target.value);
+  elements.valCpuCores.textContent = `${e.target.value} core${e.target.value === "1" ? "" : "s"}`;
+  appSettings.max_cpu_cores = parseInt(e.target.value, 10);
   saveCurrentSettings();
 });
 
 elements.rangeCpuPercent.addEventListener("input", (e) => {
-  elements.valCpuPercent.innerText = `${e.target.value}%`;
-  appSettings.max_cpu_percent = parseInt(e.target.value);
+  elements.valCpuPercent.textContent = `${e.target.value}%`;
+  appSettings.max_cpu_percent = parseInt(e.target.value, 10);
   saveCurrentSettings();
 });
 
 elements.rangeRamGb.addEventListener("input", (e) => {
-  elements.valRamGb.innerText = `${parseFloat(e.target.value).toFixed(1)} GB`;
+  elements.valRamGb.textContent = `${parseFloat(e.target.value).toFixed(1)} GB`;
   appSettings.max_ram_gb = parseFloat(e.target.value);
   saveCurrentSettings();
 });
@@ -593,21 +950,46 @@ elements.selBrowserMode.addEventListener("change", (e) => {
 
 elements.btnInstallChromium.addEventListener("click", () => {
   elements.installProgressBox.classList.remove("hidden");
-  elements.installLog.innerText = "Initiating bundled Chromium installation...\n";
+  elements.installLog.textContent = "Initiating bundled Chromium installation...\n";
   callApi("install_bundled_chromium");
 });
 
-elements.selStructurePreset.addEventListener("change", (e) => {
-  appSettings.gemini_structure_preset = e.target.value;
-  elements.customStructureGroup.classList.toggle("hidden", e.target.value !== "custom");
+// Gemini & Brand Controls
+elements.btnOpenAiStudio.addEventListener("click", () => {
+  callApi("open_external_url", "https://aistudio.google.com/");
+});
+
+elements.chkEnableGemini.addEventListener("change", () => {
+  elements.geminiSettingsContainer.style.opacity = elements.chkEnableGemini.checked ? "1" : "0.5";
   saveCurrentSettings();
+});
+
+const selectStructurePreset = (preset, persist = true) => {
+  const val = preset || "standard";
+  elements.selStructurePreset.value = val;
+  appSettings.gemini_structure_preset = val;
+  document.querySelectorAll(".preset-card").forEach((card) => {
+    card.classList.toggle("active", card.getAttribute("data-preset") === val);
+  });
+  elements.customStructureGroup.classList.toggle("hidden", val !== "custom");
+  if (persist) saveCurrentSettings();
+};
+
+document.querySelectorAll(".preset-card").forEach((card) => {
+  card.addEventListener("click", () => selectStructurePreset(card.getAttribute("data-preset"), true));
 });
 
 elements.btnToggleKeyVisibility.addEventListener("click", () => {
   const isPass = elements.geminiApiKey.type === "password";
   elements.geminiApiKey.type = isPass ? "text" : "password";
-  elements.btnToggleKeyVisibility.innerText = isPass ? "Hide" : "Show";
+  elements.btnToggleKeyVisibility.textContent = isPass ? "Hide" : "Show";
 });
+
+const syncSidebarSubtitle = () => {
+  const name = (elements.brandName.value || "").trim();
+  elements.sidebarBrandSubtitle.textContent = name || "Catalog Intelligence";
+};
+elements.brandName.addEventListener("input", syncSidebarSubtitle);
 
 // Table search filter
 elements.tableSearch.addEventListener("input", () => {
@@ -618,14 +1000,14 @@ elements.tableSearch.addEventListener("input", () => {
 // Logs copy & clear
 elements.btnCopyLog.addEventListener("click", () => {
   navigator.clipboard.writeText(elements.logTerminal.innerText);
-  alert("Log copied to clipboard!");
+  showToast("Activity log copied to clipboard", "success");
 });
 
 elements.btnClearLog.addEventListener("click", () => {
   elements.logTerminal.innerHTML = '<div class="log-entry info">[System] Log cleared.</div>';
 });
 
-// Save current form state to settings
+// Save & Load Settings
 const saveCurrentSettings = () => {
   appSettings.input_mode = inputMode;
   appSettings.manual_products_text = elements.manualProductsInput.value;
@@ -650,13 +1032,11 @@ const saveCurrentSettings = () => {
   callApi("save_settings", appSettings);
 };
 
-// Auto-save listeners on text inputs
 [
   elements.manualProductsInput,
   elements.customBrowserPath,
   elements.chkMissingOfficialPair,
   elements.chkSkipPreowned,
-  elements.chkEnableGemini,
   elements.geminiApiKey,
   elements.selGeminiModel,
   elements.txtCustomStructure,
@@ -669,23 +1049,10 @@ const saveCurrentSettings = () => {
   el.addEventListener("change", saveCurrentSettings);
 });
 
-// Load settings into UI
 const loadSettingsIntoUI = (s) => {
   appSettings = s || {};
-
-  inputMode = s.input_mode || "file";
-  if (inputMode === "manual") {
-    elements.btnModeManual.classList.add("active");
-    elements.btnModeFile.classList.remove("active");
-    elements.manualInputGroup.classList.remove("hidden");
-    elements.fileInputGroup.classList.add("hidden");
-  } else {
-    elements.btnModeFile.classList.add("active");
-    elements.btnModeManual.classList.remove("active");
-    elements.fileInputGroup.classList.remove("hidden");
-    elements.manualInputGroup.classList.add("hidden");
-  }
   elements.manualProductsInput.value = s.manual_products_text || "";
+  setInputMode(s.input_mode || "file", false);
 
   elements.inputXlsxPath.value = s.last_input_xlsx || "";
   elements.outputXlsxPath.value = s.last_output_xlsx || "";
@@ -696,55 +1063,70 @@ const loadSettingsIntoUI = (s) => {
   elements.customBrowserGroup.classList.toggle("hidden", s.browser_mode !== "custom");
 
   elements.rangeCpuCores.value = s.max_cpu_cores || 2;
-  elements.valCpuCores.innerText = `${elements.rangeCpuCores.value} cores`;
+  elements.valCpuCores.textContent = `${elements.rangeCpuCores.value} cores`;
 
   elements.rangeCpuPercent.value = s.max_cpu_percent || 40;
-  elements.valCpuPercent.innerText = `${elements.rangeCpuPercent.value}%`;
+  elements.valCpuPercent.textContent = `${elements.rangeCpuPercent.value}%`;
 
   elements.rangeRamGb.value = s.max_ram_gb || 2.0;
-  elements.valRamGb.innerText = `${parseFloat(elements.rangeRamGb.value).toFixed(1)} GB`;
+  elements.valRamGb.textContent = `${parseFloat(elements.rangeRamGb.value).toFixed(1)} GB`;
 
   elements.chkMissingOfficialPair.checked = s.search_missing_official_unofficial_pair ?? true;
   elements.chkSkipPreowned.checked = s.skip_preowned_devices ?? true;
 
   elements.chkEnableGemini.checked = s.enable_gemini ?? true;
+  elements.geminiSettingsContainer.style.opacity = elements.chkEnableGemini.checked ? "1" : "0.5";
   elements.geminiApiKey.value = s.gemini_api_key || "";
   elements.selGeminiModel.value = s.gemini_model || "gemini-2.5-flash";
-  elements.selStructurePreset.value = s.gemini_structure_preset || "standard";
+  selectStructurePreset(s.gemini_structure_preset || "standard", false);
   elements.txtCustomStructure.value = s.gemini_custom_structure || "";
-  elements.customStructureGroup.classList.toggle("hidden", s.gemini_structure_preset !== "custom");
 
   elements.brandName.value = s.brand_name || "";
   elements.brandUrl.value = s.brand_url || "";
   elements.storeAddress.value = s.store_address || "";
   elements.sellingPoints.value = s.selling_points || "";
   elements.customRules.value = s.custom_rules || "";
+  syncSidebarSubtitle();
 
-  if (s.theme) {
-    document.documentElement.setAttribute("data-theme", s.theme);
-    elements.themeIcon.innerText = s.theme === "dark" ? "🌙" : "☀️";
-    elements.themeLabel.innerText = s.theme === "dark" ? "Dark Theme" : "Light Theme";
-  }
-
+  applyTheme(s.theme || "dark", false);
   renderWebsites();
 };
 
-// Resource Poller
+// Browser Auto-Detection Badges
+const refreshBrowserBadges = async () => {
+  const detected = await callApi("detect_browsers");
+  if (!detected) return;
+  const setBadge = (el, found) => {
+    el.className = `detect-badge ${found ? "found" : "missing"}`;
+    el.textContent = found ? "Detected" : "Not Installed";
+  };
+  setBadge(elements.badgeChrome, Boolean(detected.chrome));
+  setBadge(elements.badgeMsedge, Boolean(detected.msedge));
+  setBadge(elements.badgeBrave, Boolean(detected.brave));
+};
+
+// Resource Poller (updates sidebar mini meter + full gauges)
 const pollResources = async () => {
   const res = await callApi("get_live_resources");
-  if (res) {
-    elements.miniCpu.innerText = `${res.cpu_percent}%`;
-    elements.miniRam.innerText = `${res.memory_mb} MB`;
-    elements.miniRamBar.style.width = `${res.memory_percent_of_cap}%`;
+  if (!res) return;
 
-    if (res.memory_percent_of_cap > 85) {
-      elements.miniRamBar.style.background = "var(--accent-danger)";
-    } else if (res.cpu_percent > res.max_cpu_percent) {
-      elements.miniRamBar.style.background = "var(--accent-warning)";
-    } else {
-      elements.miniRamBar.style.background = "var(--accent-primary)";
-    }
-  }
+  elements.miniCpu.textContent = `${res.cpu_percent}%`;
+  elements.miniRam.textContent = `${res.memory_mb} MB`;
+  elements.miniRamBar.style.width = `${res.memory_percent_of_cap}%`;
+
+  const cpuPct = Math.min(res.cpu_percent, 100);
+  elements.gaugeCpuText.textContent = `${res.cpu_percent}% (Cap: ${res.max_cpu_percent}%)`;
+  elements.gaugeCpuBar.style.width = `${cpuPct}%`;
+
+  elements.gaugeRamText.textContent = `${res.memory_mb} MB / ${res.max_ram_gb} GB`;
+  elements.gaugeRamBar.style.width = `${res.memory_percent_of_cap}%`;
+
+  const barColor = res.memory_percent_of_cap > 85
+    ? "var(--danger)"
+    : (res.cpu_percent > res.max_cpu_percent ? "var(--warning)" : "linear-gradient(90deg, var(--accent-primary), var(--accent-primary-2))");
+  elements.miniRamBar.style.background = barColor;
+  elements.gaugeRamBar.style.background = res.memory_percent_of_cap > 85 ? "var(--danger)" : "linear-gradient(90deg, var(--accent-primary), var(--accent-primary-2))";
+  elements.gaugeCpuBar.style.background = res.cpu_percent > res.max_cpu_percent ? "var(--warning)" : "linear-gradient(90deg, var(--accent-primary), var(--accent-primary-2))";
 };
 
 // Initialization
@@ -753,5 +1135,7 @@ window.addEventListener("pywebviewready", async () => {
   if (settings) {
     loadSettingsIntoUI(settings);
   }
+  refreshBrowserBadges();
+  pollResources();
   setInterval(pollResources, 1500);
 });

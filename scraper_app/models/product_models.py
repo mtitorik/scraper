@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass, field
 from typing import Optional, Dict, List, Any
 
@@ -98,6 +99,17 @@ class ProductRecord:
             return "not found"
         return " | ".join(self.page_links)
 
+    def _plain_description_preview(self, max_len: int = 160) -> str:
+        raw = (self.description_html or "").strip()
+        if not raw or raw.lower() == "not found":
+            return "not found"
+        # Strip HTML tags and collapse whitespace into a clean readable snippet
+        plain = re.sub(r"<[^>]+>", " ", raw)
+        plain = re.sub(r"\s+", " ", plain).strip()
+        if not plain:
+            return "not found"
+        return (plain[:max_len] + "...") if len(plain) > max_len else plain
+
     def to_summary_dict(self) -> Dict[str, Any]:
         return {
             "product_name": self.product_name,
@@ -106,7 +118,27 @@ class ProductRecord:
             "default_price": self.default_price.to_dict(),
             "status": self.status,
             "specifications": self.specifications[:120] + "..." if len(self.specifications) > 120 else self.specifications,
-            "description_html_len": len(self.description_html),
+            "description_preview": self._plain_description_preview(160),
+            "description_html_len": len(self.description_html or ""),
             "variant_count": len(self.variant_combinations),
+            "sources": self.scraped_sources,
+        }
+
+    def to_detail_dict(self) -> Dict[str, Any]:
+        return {
+            "product_name": self.product_name,
+            "page_links": self.page_links,
+            "image_folder": self.image_folder,
+            "default_price": self.default_price.to_dict(),
+            "status": self.status,
+            "specifications": self.specifications,
+            "description_html": self.description_html,
+            "description_preview": self._plain_description_preview(240),
+            "extra_fields": self.extra_fields,
+            "attribute_options": {
+                cat: [e.to_dict() for e in entries]
+                for cat, entries in self.attribute_options.items()
+            },
+            "variants": [v.to_row_dict() for v in self.variant_combinations],
             "sources": self.scraped_sources,
         }

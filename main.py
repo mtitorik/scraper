@@ -36,7 +36,7 @@ def main():
         width=1280,
         height=820,
         min_size=(980, 640),
-        background_color="#0f172a",
+        background_color="#09090b",
         text_select=True,
     )
     bridge.set_window(window)

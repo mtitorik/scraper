@@ -4,6 +4,7 @@ import json
 import asyncio
 import threading
 import subprocess
+import webbrowser
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
@@ -56,8 +57,9 @@ class ScraperBridge:
     def pick_input_file(self) -> Optional[str]:
         if not self.window:
             return None
+        dialog_type = getattr(getattr(webview, "FileDialog", None), "OPEN", webview.OPEN_DIALOG)
         res = self.window.create_file_dialog(
-            webview.OPEN_DIALOG,
+            dialog_type,
             file_types=("Excel Files (*.xlsx)",),
         )
         return res[0] if res else None
@@ -65,8 +67,9 @@ class ScraperBridge:
     def pick_output_file(self) -> Optional[str]:
         if not self.window:
             return None
+        dialog_type = getattr(getattr(webview, "FileDialog", None), "SAVE", webview.SAVE_DIALOG)
         res = self.window.create_file_dialog(
-            webview.SAVE_DIALOG,
+            dialog_type,
             file_types=("Excel Files (*.xlsx)",),
             save_filename="scraper_output.xlsx",
         )
@@ -75,8 +78,9 @@ class ScraperBridge:
     def pick_resume_file(self) -> Optional[str]:
         if not self.window:
             return None
+        dialog_type = getattr(getattr(webview, "FileDialog", None), "OPEN", webview.OPEN_DIALOG)
         res = self.window.create_file_dialog(
-            webview.OPEN_DIALOG,
+            dialog_type,
             file_types=("Excel Files (*.xlsx)",),
         )
         return res[0] if res else None
@@ -84,8 +88,23 @@ class ScraperBridge:
     def pick_folder(self) -> Optional[str]:
         if not self.window:
             return None
-        res = self.window.create_file_dialog(webview.FOLDER_DIALOG)
+        dialog_type = getattr(getattr(webview, "FileDialog", None), "FOLDER", webview.FOLDER_DIALOG)
+        res = self.window.create_file_dialog(dialog_type)
         return res[0] if res else None
+
+    def open_external_url(self, url: str) -> bool:
+        """Opens an http/https URL in the user's default system browser."""
+        if not url:
+            return False
+        clean_url = url.strip()
+        if not (clean_url.startswith("http://") or clean_url.startswith("https://")):
+            return False
+        try:
+            webbrowser.open(clean_url, new=2)
+            return True
+        except Exception as e:
+            print(f"[Bridge] Error opening URL {clean_url}: {e}")
+            return False
 
     def open_local_path(self, file_or_folder_path: str) -> bool:
         """Opens a local file or directory using the OS default application."""
@@ -140,6 +159,12 @@ class ScraperBridge:
             for v in r.variant_combinations:
                 variants.append(v.to_row_dict())
         return {"products": products, "variants": variants}
+
+    def get_product_detail(self, product_name: str) -> Optional[Dict[str, Any]]:
+        if not self.orchestrator or not self.orchestrator.workbook_manager:
+            return None
+        rec = self.orchestrator.workbook_manager.get_record(product_name)
+        return rec.to_detail_dict() if rec else None
 
     # --- Scraping Queue Controls ---
     def start_scraping(

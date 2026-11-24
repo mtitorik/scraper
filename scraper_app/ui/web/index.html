@@ -11,36 +11,39 @@
     <!-- Sidebar Navigation -->
     <aside class="sidebar">
       <div class="brand-header">
-        <div class="brand-logo">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        <div class="brand-logo" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
           </svg>
         </div>
         <div class="brand-text">
           <div class="brand-title">Scraper</div>
-          <div class="brand-subtitle">Evolution Gadget</div>
+          <div class="brand-subtitle" id="sidebar-brand-subtitle">Catalog Intelligence</div>
         </div>
       </div>
 
-      <nav class="nav-menu">
-        <button class="nav-item active" data-tab="tab-run">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-          <span>Run & Live Table</span>
+      <nav class="nav-menu" aria-label="Main navigation">
+        <button class="nav-item active" data-tab="tab-run" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+          <span>Run &amp; Live Table</span>
         </button>
-        <button class="nav-item" data-tab="tab-websites">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <button class="nav-item" data-tab="tab-websites" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           <span>Websites Waterfall</span>
+          <span class="nav-badge" id="nav-websites-count">0</span>
         </button>
-        <button class="nav-item" data-tab="tab-resources">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
-          <span>Browser & Limits</span>
+        <button class="nav-item" data-tab="tab-resources" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
+          <span>Browser &amp; Limits</span>
         </button>
-        <button class="nav-item" data-tab="tab-gemini">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          <span>Brand & Gemini AI</span>
+        <button class="nav-item" data-tab="tab-gemini" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3z"/></svg>
+          <span>Brand &amp; Gemini AI</span>
         </button>
-        <button class="nav-item" data-tab="tab-logs">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+        <button class="nav-item" data-tab="tab-logs" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
           <span>Activity Log</span>
         </button>
       </nav>
@@ -53,9 +56,17 @@
           </div>
           <div class="mini-progress-bar"><div class="mini-progress-fill" id="mini-ram-bar" style="width: 0%"></div></div>
         </div>
-        <button class="theme-toggle" id="btn-theme-toggle">
-          <span id="theme-icon">🌙</span> <span id="theme-label">Dark Theme</span>
-        </button>
+
+        <div class="theme-segmented" role="group" aria-label="Theme">
+          <button class="theme-seg-btn active" id="btn-theme-dark" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <span>Dark</span>
+          </button>
+          <button class="theme-seg-btn" id="btn-theme-light" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <span>Light</span>
+          </button>
+        </div>
       </div>
     </aside>
 
@@ -64,78 +75,111 @@
       <!-- Top Status Header -->
       <header class="app-header">
         <div class="header-status">
-          <span class="status-pill idle" id="status-badge">Idle</span>
+          <span class="status-pill idle" id="status-badge">
+            <span class="status-dot"></span>
+            <span id="status-badge-text">Idle</span>
+          </span>
           <span class="status-text" id="status-description">Ready to scrape</span>
         </div>
         <div class="header-actions">
-          <button class="btn btn-secondary btn-sm" id="btn-open-excel-top" title="Open current Excel file">
-            📊 Open .xlsx
+          <button class="btn btn-secondary btn-sm" id="btn-open-excel-top" type="button" title="Open current Excel workbook">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+            <span>Open .xlsx</span>
           </button>
-          <button class="btn btn-secondary btn-sm" id="btn-open-folder-top" title="Open image folder">
-            📁 Open Image Folder
+          <button class="btn btn-secondary btn-sm" id="btn-open-folder-top" type="button" title="Open root image folder">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <span>Open Images</span>
           </button>
         </div>
       </header>
 
       <!-- CAPTCHA Notification Alert Banner -->
-      <div class="captcha-banner hidden" id="captcha-banner">
-        <div class="captcha-icon">⚠️</div>
-        <div class="captcha-info">
-          <strong>Human Verification Required!</strong>
-          <span id="captcha-site-text">A CAPTCHA challenge was detected in the visible browser window. Please complete it.</span>
+      <div class="captcha-banner hidden" id="captcha-banner" role="alert">
+        <div class="captcha-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         </div>
-        <button class="btn btn-warning" id="btn-captcha-done">I've Verified — Continue</button>
+        <div class="captcha-info">
+          <strong>Human Verification Required</strong>
+          <span id="captcha-site-text">A CAPTCHA challenge was detected in the visible browser window. Please verify manually.</span>
+        </div>
+        <button class="btn btn-warning btn-sm" id="btn-captcha-done" type="button">I've Verified — Continue</button>
       </div>
 
       <!-- TAB 1: RUN & LIVE TABLE -->
       <section class="tab-panel active" id="tab-run">
         <!-- Configuration Card -->
         <div class="card config-card">
-          <div class="input-mode-switcher">
-            <button class="mode-btn active" id="btn-mode-file" type="button">
-              <span>📁 Upload .xlsx File</span>
-            </button>
-            <button class="mode-btn" id="btn-mode-manual" type="button">
-              <span>✍️ Enter Products Manually</span>
-            </button>
+          <div class="config-top-bar">
+            <div class="input-mode-switcher" role="tablist" aria-label="Product input mode">
+              <button class="mode-btn active" id="btn-mode-file" type="button" role="tab" aria-selected="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <span>Upload .xlsx File</span>
+              </button>
+              <button class="mode-btn" id="btn-mode-manual" type="button" role="tab" aria-selected="false">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                <span>Enter Products Manually</span>
+              </button>
+            </div>
+            <span class="config-hint" id="config-mode-hint">Reads product names from Column A of your spreadsheet</span>
+          </div>
+
+          <!-- Spacious Full-Width Manual Product Entry Section -->
+          <div class="manual-entry-panel hidden" id="manual-input-group">
+            <div class="manual-entry-header">
+              <div class="manual-entry-title">
+                <label for="manual-products-input">Products to Search</label>
+                <span class="count-pill" id="manual-product-count">0 products ready</span>
+              </div>
+              <button class="btn btn-ghost btn-xs" id="btn-clear-manual" type="button">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <span>Clear</span>
+              </button>
+            </div>
+
+            <div class="manual-quick-add">
+              <input type="text" id="manual-quick-input" placeholder="Quick add: type a product name and press Enter (e.g. Apple AirPods Pro 2)...">
+              <button class="btn btn-secondary btn-sm" id="btn-manual-quick-add" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>Add</span>
+              </button>
+            </div>
+
+            <textarea id="manual-products-input" class="manual-textarea" rows="4" placeholder="Or paste multiple product names here (one per line or comma-separated):&#10;Apple AirPods Pro 2&#10;iPhone 16 Pro&#10;Anker Soundcore R60i NC"></textarea>
           </div>
 
           <div class="file-pickers-grid">
             <div class="form-group" id="file-input-group">
-              <label>Input .xlsx File <small>(Product Names in Col A)</small></label>
+              <label for="input-xlsx-path">Input .xlsx File <small>(Column A)</small></label>
               <div class="input-with-button">
                 <input type="text" id="input-xlsx-path" placeholder="Select source product list..." readonly>
-                <button class="btn btn-secondary" id="btn-browse-input">Browse...</button>
-              </div>
-            </div>
-
-            <div class="form-group hidden" id="manual-input-group">
-              <label>Enter Product Names to Search <small>(One per line or separated by comma)</small></label>
-              <textarea id="manual-products-input" rows="2" placeholder="e.g.&#10;iPhone 16 Pro&#10;Samsung Galaxy S24 Ultra&#10;AirPods 4"></textarea>
-            </div>
-
-            <div class="form-group">
-              <label>New Output .xlsx File <small>(Saves after every product)</small></label>
-              <div class="input-with-button">
-                <input type="text" id="output-xlsx-path" placeholder="Choose where to save new .xlsx..." readonly>
-                <button class="btn btn-secondary" id="btn-browse-output">Choose...</button>
+                <button class="btn btn-secondary" id="btn-browse-input" type="button">Browse</button>
               </div>
             </div>
 
             <div class="form-group">
-              <label>Root Image Folder <small>(Subfolder per product)</small></label>
+              <label for="output-xlsx-path">Output .xlsx File <small>(Saves incrementally)</small></label>
               <div class="input-with-button">
-                <input type="text" id="root-folder-path" placeholder="Select folder to save high-res JPEG images..." readonly>
-                <button class="btn btn-secondary" id="btn-browse-folder">Browse...</button>
+                <input type="text" id="output-xlsx-path" placeholder="Auto-defaults in manual mode, or choose path..." readonly>
+                <button class="btn btn-secondary" id="btn-browse-output" type="button">Choose</button>
               </div>
             </div>
 
             <div class="form-group">
-              <label>Resume Existing Run? <small>(Optional)</small></label>
+              <label for="root-folder-path">Root Image Folder <small>(Subfolder per product)</small></label>
               <div class="input-with-button">
-                <input type="text" id="resume-xlsx-path" placeholder="Optional: Pick existing output to resume..." readonly>
-                <button class="btn btn-secondary" id="btn-browse-resume">Resume...</button>
-                <button class="btn btn-icon" id="btn-clear-resume" title="Clear resume file">✕</button>
+                <input type="text" id="root-folder-path" placeholder="Select folder for full-res JPEG images..." readonly>
+                <button class="btn btn-secondary" id="btn-browse-folder" type="button">Browse</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="resume-xlsx-path">Resume Existing Run <small>(Optional)</small></label>
+              <div class="input-with-button">
+                <input type="text" id="resume-xlsx-path" placeholder="Pick a partially completed output .xlsx..." readonly>
+                <button class="btn btn-secondary" id="btn-browse-resume" type="button">Resume</button>
+                <button class="btn btn-ghost btn-icon" id="btn-clear-resume" type="button" title="Clear resume file">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
               </div>
             </div>
           </div>
@@ -143,21 +187,24 @@
           <!-- Controls Toolbar -->
           <div class="controls-toolbar">
             <div class="playback-buttons">
-              <button class="btn btn-primary btn-lg" id="btn-start">
-                <span>▶</span> Start Scraping
+              <button class="btn btn-primary btn-lg" id="btn-start" type="button">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                <span>Start Scraping</span>
               </button>
-              <button class="btn btn-warning btn-lg" id="btn-pause" disabled>
-                <span>⏸</span> Pause
+              <button class="btn btn-warning btn-lg" id="btn-pause" type="button" disabled>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                <span>Pause</span>
               </button>
-              <button class="btn btn-danger btn-lg" id="btn-stop" disabled>
-                <span>⏹</span> Stop
+              <button class="btn btn-danger btn-lg" id="btn-stop" type="button" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                <span>Stop</span>
               </button>
             </div>
 
             <div class="overall-progress-box">
               <div class="progress-labels">
                 <span id="progress-status-label">0 / 0 Products (0%)</span>
-                <span id="progress-site-label">-</span>
+                <span id="progress-site-label">Idle</span>
               </div>
               <div class="progress-track">
                 <div class="progress-bar" id="main-progress-bar" style="width: 0%"></div>
@@ -166,15 +213,38 @@
           </div>
         </div>
 
+        <!-- Live KPI Summary Strip -->
+        <div class="kpi-strip">
+          <div class="kpi-card">
+            <span class="kpi-label">Total Products</span>
+            <strong class="kpi-value" id="kpi-total">0</strong>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label"><span class="kpi-dot success"></span>Completed</span>
+            <strong class="kpi-value" id="kpi-done">0</strong>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label"><span class="kpi-dot danger"></span>Not Found</span>
+            <strong class="kpi-value" id="kpi-not-found">0</strong>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label"><span class="kpi-dot accent"></span>Variants Captured</span>
+            <strong class="kpi-value" id="kpi-variants">0</strong>
+          </div>
+        </div>
+
         <!-- Live Spreadsheet Card -->
         <div class="card table-card">
           <div class="table-card-header">
-            <div class="sheet-tabs">
-              <button class="sheet-tab active" id="tab-sheet-1">Sheet 1: Products</button>
-              <button class="sheet-tab" id="tab-sheet-2">Sheet 2: All Variant Combinations</button>
+            <div class="sheet-tabs" role="tablist">
+              <button class="sheet-tab active" id="tab-sheet-1" type="button" role="tab">Sheet 1: Products</button>
+              <button class="sheet-tab" id="tab-sheet-2" type="button" role="tab">Sheet 2: All Variant Combinations</button>
             </div>
             <div class="table-tools">
-              <input type="text" class="table-search-input" id="table-search" placeholder="Filter rows...">
+              <div class="search-input-wrap">
+                <svg class="search-icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" class="table-search-input" id="table-search" placeholder="Filter rows...">
+              </div>
               <span class="row-count-badge" id="table-row-count">0 rows</span>
             </div>
           </div>
@@ -195,7 +265,23 @@
                 </tr>
               </thead>
               <tbody id="tbody-sheet-1">
-                <tr><td colspan="8" class="empty-state">No products loaded yet. Select an input .xlsx and click Start!</td></tr>
+                <tr>
+                  <td colspan="8" class="empty-state-cell">
+                    <div class="empty-state-box">
+                      <div class="empty-state-icon" aria-hidden="true">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                      </div>
+                      <div class="empty-state-title">No products loaded yet</div>
+                      <div class="empty-state-steps">
+                        <span>1. Upload .xlsx or enter products manually</span>
+                        <span class="step-arrow">&rarr;</span>
+                        <span>2. Add stores in Websites Waterfall</span>
+                        <span class="step-arrow">&rarr;</span>
+                        <span>3. Click Start Scraping</span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
               </tbody>
             </table>
 
@@ -216,7 +302,14 @@
                 </tr>
               </thead>
               <tbody id="tbody-sheet-2">
-                <tr><td colspan="10" class="empty-state">All exact variant combinations will update here live.</td></tr>
+                <tr>
+                  <td colspan="10" class="empty-state-cell">
+                    <div class="empty-state-box">
+                      <div class="empty-state-title">No variant combinations captured yet</div>
+                      <div class="empty-state-sub">Every clicked color, storage, region, and official/unofficial price will appear here live.</div>
+                    </div>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -227,13 +320,16 @@
       <section class="tab-panel" id="tab-websites">
         <div class="card">
           <div class="card-header">
-            <h2>Website Search Hierarchy (Waterfall Order)</h2>
-            <p>Scraper checks Website 1 first, records details, and checks Website 2+ only for missing items. Unlimited sites can be added.</p>
+            <h2>Website Search Hierarchy</h2>
+            <p>Scraper searches Website #1 first, records all details, then checks Website #2+ only for missing rows or missing variants. Add unlimited websites in priority order.</p>
           </div>
 
           <div class="add-website-bar">
-            <input type="url" id="new-website-url" placeholder="https://example.com">
-            <button class="btn btn-primary" id="btn-add-website">+ Add Website</button>
+            <input type="url" id="new-website-url" placeholder="https://www.applegadgetsbd.com">
+            <button class="btn btn-primary" id="btn-add-website" type="button">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span>Add Website</span>
+            </button>
           </div>
 
           <ul class="website-list" id="website-list">
@@ -241,15 +337,27 @@
           </ul>
 
           <div class="options-box">
-            <h3>Advanced Matching Rules</h3>
-            <label class="checkbox-label">
-              <input type="checkbox" id="chk-missing-official-pair" checked>
-              <span><strong>Option C:</strong> Also search next websites if Official or Unofficial variant is missing on smartphones/devices.</span>
-            </label>
-            <label class="checkbox-label">
-              <input type="checkbox" id="chk-skip-preowned" checked>
-              <span><strong>Filter:</strong> Skip Pre-Owned, Used, Refurbished, and Open-Box listings automatically.</span>
-            </label>
+            <h3>Matching &amp; Filtering Rules</h3>
+            <div class="toggle-row">
+              <div class="toggle-row-info">
+                <strong>Search next websites for missing Official / Unofficial pair</strong>
+                <span>When a device only has Official or only Unofficial on Website #1, check Website #2+ to fill the missing half.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="chk-missing-official-pair" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-row-info">
+                <strong>Skip Pre-Owned, Used &amp; Refurbished listings</strong>
+                <span>Automatically ignores used, open-box, and refurbished results unless explicitly written in your product name.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="chk-skip-preowned" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
           </div>
         </div>
       </section>
@@ -258,33 +366,48 @@
       <section class="tab-panel" id="tab-resources">
         <div class="card">
           <div class="card-header">
-            <h2>Browser Configuration (Always-Visible Incognito Mode)</h2>
-            <p>Runs in real-time visible mode so you can watch every search, click, and page navigation live.</p>
+            <h2>Browser Engine (Always-Visible Incognito)</h2>
+            <p>Launches a clean, isolated visible Incognito browser window without touching personal bookmarks, tabs, or logins.</p>
+          </div>
+
+          <div class="browser-status-grid" id="browser-status-grid">
+            <div class="browser-pill-card">
+              <span class="browser-name">Google Chrome</span>
+              <span class="detect-badge checking" id="badge-chrome">Checking...</span>
+            </div>
+            <div class="browser-pill-card">
+              <span class="browser-name">Microsoft Edge</span>
+              <span class="detect-badge checking" id="badge-msedge">Checking...</span>
+            </div>
+            <div class="browser-pill-card">
+              <span class="browser-name">Brave Browser</span>
+              <span class="detect-badge checking" id="badge-brave">Checking...</span>
+            </div>
           </div>
 
           <div class="form-group">
-            <label>Browser Selection (Best of Both Worlds)</label>
+            <label for="sel-browser-mode">Active Browser Preference</label>
             <select id="sel-browser-mode" class="form-select">
-              <option value="auto">Auto-Detect Installed (Chrome → Edge → Brave)</option>
+              <option value="auto">Auto-Detect Installed (Chrome &rarr; Edge &rarr; Brave)</option>
               <option value="chrome">Google Chrome</option>
               <option value="msedge">Microsoft Edge</option>
               <option value="brave">Brave Browser</option>
               <option value="bundled">Playwright Built-in Chromium</option>
-              <option value="custom">Custom Browser Path...</option>
+              <option value="custom">Custom Browser Binary Path...</option>
             </select>
           </div>
 
           <div class="form-group hidden" id="custom-browser-group">
-            <label>Custom Browser Binary Path</label>
-            <input type="text" id="custom-browser-path" placeholder="/path/to/chrome or C:\...\chrome.exe">
+            <label for="custom-browser-path">Custom Browser Binary Path</label>
+            <input type="text" id="custom-browser-path" placeholder="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome">
           </div>
 
           <div class="action-card">
             <div>
-              <strong>1-Click Built-in Chromium Installer</strong>
-              <p>For computers without Chrome or Edge, click below to install Playwright's built-in browser automatically.</p>
+              <strong>Built-in Chromium Fallback</strong>
+              <p>If Chrome, Edge, or Brave is not installed on this computer, download Playwright's built-in Chromium in one click.</p>
             </div>
-            <button class="btn btn-secondary" id="btn-install-chromium">Install Built-in Browser</button>
+            <button class="btn btn-secondary" id="btn-install-chromium" type="button">Install Built-in Browser</button>
           </div>
           <div class="install-progress-box hidden" id="install-progress-box">
             <pre id="install-log"></pre>
@@ -293,36 +416,57 @@
 
         <div class="card">
           <div class="card-header">
-            <h2>Interactive Resource Guardrails (psutil)</h2>
-            <p>Prevents Scraper from overwhelming employee computers or exceeding memory limits over long runs.</p>
+            <h2>Interactive Resource Guardrails</h2>
+            <p>Live CPU and memory telemetry across Python and all spawned browser processes.</p>
+          </div>
+
+          <div class="live-gauges-grid">
+            <div class="gauge-card">
+              <div class="gauge-top">
+                <span class="gauge-title">Live CPU Usage</span>
+                <strong class="gauge-number" id="gauge-cpu-text">0%</strong>
+              </div>
+              <div class="progress-track">
+                <div class="progress-bar" id="gauge-cpu-bar" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="gauge-card">
+              <div class="gauge-top">
+                <span class="gauge-title">Live Memory Usage</span>
+                <strong class="gauge-number" id="gauge-ram-text">0 MB / 2.0 GB</strong>
+              </div>
+              <div class="progress-track">
+                <div class="progress-bar" id="gauge-ram-bar" style="width: 0%"></div>
+              </div>
+            </div>
           </div>
 
           <div class="sliders-grid">
             <div class="slider-control">
               <div class="slider-header">
-                <label>Max CPU Cores Allowed</label>
+                <label for="range-cpu-cores">Max CPU Cores</label>
                 <span class="slider-val" id="val-cpu-cores">2 cores</span>
               </div>
               <input type="range" id="range-cpu-cores" min="1" max="8" value="2" step="1">
-              <small>Limits worker threads and process affinity.</small>
+              <small>Caps worker concurrency and OS CPU affinity.</small>
             </div>
 
             <div class="slider-control">
               <div class="slider-header">
-                <label>Max CPU Usage % Cap</label>
+                <label for="range-cpu-percent">Max CPU Usage %</label>
                 <span class="slider-val" id="val-cpu-percent">40%</span>
               </div>
               <input type="range" id="range-cpu-percent" min="20" max="90" value="40" step="5">
-              <small>Dynamically injects adaptive micro-pauses if CPU usage exceeds threshold.</small>
+              <small>Injects adaptive micro-pauses when CPU exceeds cap.</small>
             </div>
 
             <div class="slider-control">
               <div class="slider-header">
-                <label>Max RAM Limit Ceiling (GB)</label>
+                <label for="range-ram-gb">Max RAM Ceiling</label>
                 <span class="slider-val" id="val-ram-gb">2.0 GB</span>
               </div>
               <input type="range" id="range-ram-gb" min="1.0" max="8.0" value="2.0" step="0.5">
-              <small>Cleanly recycles browser context between products above 85% to release cached DOM memory.</small>
+              <small>Recycles browser context between products above 85%.</small>
             </div>
           </div>
         </div>
@@ -335,7 +479,7 @@
             <div class="toggle-header">
               <div>
                 <h2>Google Gemini AI Content Engine</h2>
-                <p>Rewrites descriptions into clean semantic HTML and generates specifications.</p>
+                <p>Rewrites product descriptions into clean semantic HTML and generates missing specs. Skipped automatically for Not Found products.</p>
               </div>
               <label class="switch">
                 <input type="checkbox" id="chk-enable-gemini" checked>
@@ -347,70 +491,91 @@
           <div id="gemini-settings-container">
             <div class="form-grid">
               <div class="form-group">
-                <label>Google Gemini API Key <small><a href="https://aistudio.google.com/" target="_blank">(Get Free Key at Google AI Studio)</a></small></label>
+                <label for="gemini-api-key">
+                  Google Gemini API Key
+                  <button class="inline-link-btn" id="btn-open-aistudio" type="button">(Get Free Key &nearr;)</button>
+                </label>
                 <div class="input-with-button">
-                  <input type="password" id="gemini-api-key" placeholder="Enter AI Studio API Key...">
-                  <button class="btn btn-secondary" id="btn-toggle-key-visibility">Show</button>
+                  <input type="password" id="gemini-api-key" placeholder="Paste Google AI Studio key (optional — works without AI too)...">
+                  <button class="btn btn-secondary" id="btn-toggle-key-visibility" type="button">Show</button>
                 </div>
               </div>
 
               <div class="form-group">
-                <label>AI Model Selection</label>
+                <label for="sel-gemini-model">AI Model Tier</label>
                 <select id="sel-gemini-model" class="form-select">
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended — Free Tier Friendly & Zero Cost)</option>
-                  <option value="gemini-2.5-pro">Gemini 2.5 Pro (High Reasoning — Tighter Free Rate Limits)</option>
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended — Free Tier Friendly)</option>
+                  <option value="gemini-2.5-pro">Gemini 2.5 Pro (Higher Reasoning — Stricter Free Limits)</option>
                 </select>
               </div>
             </div>
 
             <div class="form-group">
-              <label>Description HTML Structure / Template</label>
-              <select id="sel-structure-preset" class="form-select">
-                <option value="standard">Standard E-Commerce (Intro + Key Highlights + Why Buy From Us)</option>
-                <option value="short">Short & Punchy (2 Sentences + 4 Bullet Points)</option>
-                <option value="detailed">Detailed Breakdown (Design + Specs + Display + Guarantee)</option>
-                <option value="custom">Custom Outline (Define Your Own Section Structure Below)</option>
+              <label>Description HTML Structure Template</label>
+              <select id="sel-structure-preset" class="hidden" aria-hidden="true">
+                <option value="standard">standard</option>
+                <option value="short">short</option>
+                <option value="detailed">detailed</option>
+                <option value="custom">custom</option>
               </select>
+              <div class="preset-cards-grid" id="preset-cards-grid">
+                <button class="preset-card active" data-preset="standard" type="button">
+                  <strong>Standard E-Commerce</strong>
+                  <span>Intro paragraph + Key Features bullets + Why Buy From Us</span>
+                </button>
+                <button class="preset-card" data-preset="short" type="button">
+                  <strong>Short &amp; Punchy</strong>
+                  <span>Concise 2-sentence hook + 4 crisp highlight bullets</span>
+                </button>
+                <button class="preset-card" data-preset="detailed" type="button">
+                  <strong>Detailed Guide</strong>
+                  <span>Design, Performance, Specs Highlights + Store Guarantee</span>
+                </button>
+                <button class="preset-card" data-preset="custom" type="button">
+                  <strong>Custom Structure</strong>
+                  <span>Write your own section-by-section outline below</span>
+                </button>
+              </div>
             </div>
 
             <div class="form-group hidden" id="custom-structure-group">
-              <label>Custom HTML Structure Instructions for Gemini</label>
-              <textarea id="txt-custom-structure" rows="4" placeholder="Enter section by section tags and instructions..."></textarea>
+              <label for="txt-custom-structure">Custom HTML Structure Instructions for Gemini</label>
+              <textarea id="txt-custom-structure" rows="4" placeholder="1. Opening Hook Paragraph&#10;2. Key Highlights Bullet List&#10;3. Performance &amp; Battery Summary&#10;4. Why Buy From [Your Store]"></textarea>
             </div>
           </div>
         </div>
 
         <div class="card">
           <div class="card-header">
-            <h2>Brand & Store Customization (White-Label / Public Ready)</h2>
-            <p>Scraper removes all competitor store names/URLs/phones and inserts your store details.</p>
+            <h2>Store Brand Profile</h2>
+            <p>All competitor store names, URLs, phones, and addresses are stripped automatically and replaced with your store details.</p>
           </div>
 
           <div class="form-grid">
             <div class="form-group">
-              <label>Store / Brand Name</label>
+              <label for="brand-name">Store / Brand Name</label>
               <input type="text" id="brand-name" placeholder="e.g. Evolution Gadget">
             </div>
 
             <div class="form-group">
-              <label>Website URL</label>
+              <label for="brand-url">Website URL</label>
               <input type="text" id="brand-url" placeholder="https://evolutiongadget.tech">
             </div>
           </div>
 
           <div class="form-group">
-            <label>Store Address</label>
+            <label for="store-address">Store Address</label>
             <input type="text" id="store-address" placeholder="e.g. Shop 42, Level 5, Bashundhara City, Dhaka">
           </div>
 
           <div class="form-group">
-            <label>Key Selling Points to Highlight</label>
-            <textarea id="selling-points" rows="2" placeholder="e.g. 100% Genuine Products, Official & International Warranty, Fast Nationwide Delivery..."></textarea>
+            <label for="selling-points">Key Selling Points to Highlight</label>
+            <textarea id="selling-points" rows="2" placeholder="e.g. 100% Genuine Products, Official &amp; International Warranty, Fast Nationwide Delivery..."></textarea>
           </div>
 
           <div class="form-group">
-            <label>Custom Rules / Prompt Tweaks</label>
-            <textarea id="custom-rules" rows="2" placeholder="e.g. Always emphasize genuine Apple products. Keep tone conversational yet authoritative..."></textarea>
+            <label for="custom-rules">Custom Rules / Prompt Tweaks</label>
+            <textarea id="custom-rules" rows="2" placeholder="e.g. Keep tone helpful and trustworthy. Always emphasize official warranty coverage..."></textarea>
           </div>
         </div>
       </section>
@@ -419,10 +584,16 @@
       <section class="tab-panel" id="tab-logs">
         <div class="card log-card">
           <div class="card-header log-header">
-            <h2>Execution & Activity Log</h2>
+            <h2>Execution &amp; Activity Log</h2>
             <div class="log-actions">
-              <button class="btn btn-secondary btn-sm" id="btn-copy-log">📋 Copy Log</button>
-              <button class="btn btn-secondary btn-sm" id="btn-clear-log">🗑 Clear</button>
+              <button class="btn btn-secondary btn-sm" id="btn-copy-log" type="button">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>Copy Log</span>
+              </button>
+              <button class="btn btn-secondary btn-sm" id="btn-clear-log" type="button">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                <span>Clear</span>
+              </button>
             </div>
           </div>
           <div class="log-terminal" id="log-terminal">
@@ -432,6 +603,72 @@
       </section>
     </main>
   </div>
+
+  <!-- Slide-Over Product Inspector Drawer -->
+  <div class="drawer-backdrop hidden" id="drawer-backdrop"></div>
+  <aside class="product-drawer hidden" id="product-drawer" aria-label="Product details inspector">
+    <div class="drawer-header">
+      <div class="drawer-title-block">
+        <h3 id="drawer-product-name">Product Details</h3>
+        <div class="drawer-meta" id="drawer-meta"></div>
+      </div>
+      <button class="btn btn-ghost btn-icon" id="btn-close-drawer" type="button" title="Close inspector">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="drawer-quick-actions" id="drawer-quick-actions"></div>
+
+    <div class="drawer-tabs" role="tablist">
+      <button class="drawer-tab active" data-drawer-tab="desc" type="button">Description</button>
+      <button class="drawer-tab" data-drawer-tab="specs" type="button">Specifications</button>
+      <button class="drawer-tab" data-drawer-tab="variants" type="button">Variants</button>
+    </div>
+
+    <div class="drawer-body">
+      <!-- Description Pane -->
+      <div class="drawer-pane active" id="drawer-pane-desc">
+        <div class="drawer-pane-toolbar">
+          <div class="mini-seg">
+            <button class="mini-seg-btn active" id="btn-desc-rendered" type="button">Rendered Preview</button>
+            <button class="mini-seg-btn" id="btn-desc-raw" type="button">Raw HTML</button>
+          </div>
+          <button class="btn btn-secondary btn-xs" id="btn-copy-desc-html" type="button">Copy HTML</button>
+        </div>
+        <div class="html-preview-box" id="drawer-desc-rendered"></div>
+        <pre class="code-preview-box hidden" id="drawer-desc-raw"></pre>
+      </div>
+
+      <!-- Specs Pane -->
+      <div class="drawer-pane hidden" id="drawer-pane-specs">
+        <div class="drawer-pane-toolbar">
+          <span class="drawer-pane-hint">Plain-text specifications</span>
+          <button class="btn btn-secondary btn-xs" id="btn-copy-specs" type="button">Copy Specs</button>
+        </div>
+        <pre class="specs-preview-box" id="drawer-specs-content"></pre>
+      </div>
+
+      <!-- Variants Pane -->
+      <div class="drawer-pane hidden" id="drawer-pane-variants">
+        <div id="drawer-variants-list" class="drawer-variants-list"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Native Confirmation Dialog -->
+  <dialog class="confirm-dialog" id="confirm-dialog">
+    <div class="confirm-dialog-content">
+      <h3 id="confirm-dialog-title">Confirm Action</h3>
+      <p id="confirm-dialog-message">Are you sure?</p>
+      <div class="confirm-dialog-actions">
+        <button class="btn btn-secondary" id="btn-confirm-cancel" type="button">Cancel</button>
+        <button class="btn btn-danger" id="btn-confirm-ok" type="button">Confirm</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
   <script src="app.js"></script>
 </body>
