@@ -3,6 +3,7 @@ from scraper_app.scraper.matcher import (
     is_accessory,
     is_preowned_or_used,
     matches_model_name,
+    score_candidate,
     classify_official_unofficial,
     extract_region,
     extract_storage,
@@ -91,3 +92,38 @@ def test_extract_storage():
     assert extract_storage("iPhone 16 Pro 256 gb Natural") == "256GB"
     assert extract_storage("iPhone 16 Pro Max 1TB Desert") == "1TB"
     assert extract_storage("iPhone 16 Pro Black") == "not found"
+
+
+def test_airpods_pro_2_never_matches_pro_3_and_allows_charging_case():
+    query = "Apple AirPods Pro 2"
+    # Real AirPods Pro 2 with Charging Case must NOT be rejected as an accessory
+    real_listing = "Apple AirPods Pro 2 (2nd Gen) with MagSafe Charging Case (USB-C)"
+    assert is_accessory(real_listing, query) is False
+    assert matches_model_name(real_listing, query) is True
+
+    # Standalone silicone case MUST still be rejected as an accessory
+    assert is_accessory("Apple AirPods Pro 2 Silicone Case Cover", query) is True
+
+    # AirPods Pro 3 MUST be rejected when searching AirPods Pro 2!
+    assert matches_model_name("Apple AirPods Pro 3", query) is False
+    assert matches_model_name("Apple AirPods Pro 3 with MagSafe Charging Case", query) is False
+
+
+def test_joyroom_jr_oe2s_and_anker_r60i_nc_matching():
+    # Joyroom JR-OE2S matches both full SKU and prefix-omitted title + charging case
+    q_joyroom = "Joyroom JR-OE2S"
+    assert is_accessory("Joyroom JR-OE2S Open-Ear Wireless Earbuds with Charging Case", q_joyroom) is False
+    assert matches_model_name("Joyroom JR-OE2S Open-Ear Wireless Earbuds with Charging Case", q_joyroom) is True
+    assert matches_model_name("Joyroom OE2S Open-Ear Earbuds", q_joyroom) is True
+
+    # Anker Soundcore R60i NC
+    q_anker = "Anker Soundcore R60i NC"
+    assert is_accessory("Anker Soundcore R60i NC True Wireless Earbuds with Charging Case", q_anker) is False
+    assert matches_model_name("Anker Soundcore R60i NC True Wireless Earbuds with Charging Case", q_anker) is True
+
+
+def test_candidate_scoring_ranks_exact_match_first():
+    query = "Apple AirPods Pro 2"
+    exact = score_candidate("Apple AirPods Pro 2 (USB-C)", query)
+    verbose = score_candidate("Apple AirPods Pro 2nd Generation MagSafe Charging Case International Edition Bundle", query)
+    assert exact > verbose
