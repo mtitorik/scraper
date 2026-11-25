@@ -46,6 +46,7 @@ class ScraperOrchestrator:
         self.browser_manager = BrowserManager(
             mode=settings.browser_mode,
             custom_path=settings.custom_browser_path,
+            block_trackers=settings.block_trackers,
         )
         self.gemini_engine = GeminiEngine(settings)
         self.image_downloader: Optional[ImageDownloader] = None
@@ -240,6 +241,7 @@ class ScraperOrchestrator:
                         if k.strip()
                     ]
 
+                    page_timeout_ms = max(10, int(self.settings.page_timeout_sec or 25)) * 1000
                     candidates = await SiteScraper.search_product(
                         page=page,
                         site_url=site_url,
@@ -249,6 +251,7 @@ class ScraperOrchestrator:
                         strict_model_matching=self.settings.strict_model_matching,
                         enable_fallback_sku_search=self.settings.enable_fallback_sku_search,
                         custom_excludes=custom_excludes,
+                        page_timeout_ms=page_timeout_ms,
                     )
 
                     if await PopupGuard.detect_human_verification(page):
@@ -282,6 +285,7 @@ class ScraperOrchestrator:
                             stop_event=self.stop_event,
                             throttle_callback=self.resource_guard.throttle_if_needed,
                             scrape_variants=self.settings.scrape_variants,
+                            page_timeout_ms=page_timeout_ms,
                         )
 
                         # Merge prices
@@ -314,9 +318,13 @@ class ScraperOrchestrator:
 
                         # Download and convert images (when enabled in Matching & Filtering Rules)
                         if self.settings.download_images and page_data["image_urls"]:
+                            img_urls = page_data["image_urls"]
+                            max_imgs = int(self.settings.max_images_per_product or 0)
+                            if max_imgs > 0:
+                                img_urls = img_urls[:max_imgs]
                             folder, saved_imgs = self.image_downloader.download_product_images(
                                 product_name=record.product_name,
-                                image_urls=page_data["image_urls"],
+                                image_urls=img_urls,
                             )
                             record.image_folder = folder
 
@@ -336,6 +344,11 @@ class ScraperOrchestrator:
                     self.on_row_updated(record.to_summary_dict())
                     self.on_log(f"Saved '{record.product_name}' -> Status: {record.status}")
 
+                    # Optional politeness delay between products to avoid rate-limiting
+                    delay_s = float(self.settings.request_delay_sec or 0.0)
+                    if delay_s > 0 and not self.stop_event.is_set():
+                        await asyncio.sleep(delay_s)
+
                     # Check RAM ceiling and recycle browser context if needed
                     if self.resource_guard.should_recycle_browser():
                         self.on_log("RAM ceiling reached (>85%). Recycling Incognito browser context...")
@@ -354,6 +367,17 @@ class ScraperOrchestrator:
 
             # Finished all records
             self.on_log("Scraping queue complete! All rows saved to Excel.")
+            if self.settings.auto_open_excel and os.path.exists(output_xlsx_path):
+                try:
+                    import subprocess
+                    if sys.platform == "win32":
+                        os.startfile(output_xlsx_path)
+                    elif sys.platform == "darwin":
+                        subprocess.Popen(["open", output_xlsx_path])
+                    else:
+                        subprocess.Popen(["xdg-open", output_xlsx_path])
+                except Exception:
+                    pass
             self.on_progress({
                 "current": total_count,
                 "total": total_count,

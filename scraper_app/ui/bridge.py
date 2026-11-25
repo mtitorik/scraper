@@ -53,6 +53,13 @@ class ScraperBridge:
             self.orchestrator.update_settings(new_settings)
         return success
 
+    def reset_settings(self) -> Dict[str, Any]:
+        defaults = AppSettings()
+        self.settings_manager.save(defaults)
+        if self.orchestrator:
+            self.orchestrator.update_settings(defaults)
+        return defaults.to_dict()
+
     # --- Native OS Dialogs ---
     def pick_input_file(self) -> Optional[str]:
         if not self.window:

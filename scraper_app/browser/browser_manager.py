@@ -14,9 +14,10 @@ class BrowserManager:
     RAM-based context recycling, and 1-click built-in Chromium installation.
     """
 
-    def __init__(self, mode: str = "auto", custom_path: str = ""):
+    def __init__(self, mode: str = "auto", custom_path: str = "", block_trackers: bool = True):
         self.mode = mode  # "auto", "chrome", "msedge", "brave", "bundled", "custom"
         self.custom_path = custom_path
+        self.block_trackers = block_trackers
         self._playwright: Optional[Playwright] = None
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
@@ -174,15 +175,16 @@ class BrowserManager:
             ignore_https_errors=True,
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
         )
-        # Abort known 3rd-party analytics/chat pixels so pages settle much faster without touching site logic/images
-        async def _route_filter(route):
-            url_lower = route.request.url.lower()
-            if any(d in url_lower for d in self.TRACKER_DOMAINS):
-                await route.abort()
-            else:
-                await route.continue_()
+        if self.block_trackers:
+            # Abort known 3rd-party analytics/chat pixels so pages settle much faster without touching site logic/images
+            async def _route_filter(route):
+                url_lower = route.request.url.lower()
+                if any(d in url_lower for d in self.TRACKER_DOMAINS):
+                    await route.abort()
+                else:
+                    await route.continue_()
 
-        await context.route("**/*", _route_filter)
+            await context.route("**/*", _route_filter)
         return context
 
     async def recycle_context(self) -> Page:

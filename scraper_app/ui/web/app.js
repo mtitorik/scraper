@@ -8,6 +8,8 @@ let productsMap = new Map(); // product_name -> summary dict
 let isScrapingRunning = false;
 let isScrapingPaused = false;
 let activeDrawerDetail = null;
+let runStartedAtMs = 0;
+let isBulkEditMode = false;
 
 // Audio chime for CAPTCHA and completion
 const playAlertChime = () => {
@@ -56,7 +58,12 @@ const elements = {
   pillReadyFolderText: document.getElementById("pill-ready-folder-text"),
   btnJumpResults: document.getElementById("btn-jump-results"),
 
-  // Input mode & manual entry
+  btnOpenCmdk: document.getElementById("btn-open-cmdk"),
+  cmdkDialog: document.getElementById("cmdk-dialog"),
+  cmdkInput: document.getElementById("cmdk-input"),
+  cmdkList: document.getElementById("cmdk-list"),
+
+  // Input mode & manual entry composer
   btnModeFile: document.getElementById("btn-mode-file"),
   btnModeManual: document.getElementById("btn-mode-manual"),
   configModeHint: document.getElementById("config-mode-hint"),
@@ -64,8 +71,14 @@ const elements = {
   manualInputGroup: document.getElementById("manual-input-group"),
   manualQuickInput: document.getElementById("manual-quick-input"),
   btnManualQuickAdd: document.getElementById("btn-manual-quick-add"),
+  manualQueueWrap: document.getElementById("manual-queue-wrap"),
+  manualProductList: document.getElementById("manual-product-list"),
+  manualQueueEmpty: document.getElementById("manual-queue-empty"),
+  manualBulkWrap: document.getElementById("manual-bulk-wrap"),
   manualProductsInput: document.getElementById("manual-products-input"),
   manualProductCount: document.getElementById("manual-product-count"),
+  btnPasteClipboard: document.getElementById("btn-paste-clipboard"),
+  btnToggleBulkMode: document.getElementById("btn-toggle-bulk-mode"),
   btnClearManual: document.getElementById("btn-clear-manual"),
 
   // File pickers
@@ -96,6 +109,7 @@ const elements = {
   kpiVariants: document.getElementById("kpi-variants"),
 
   // Table
+  btnRetryNotFound: document.getElementById("btn-retry-not-found"),
   tableSheet1Elem: document.getElementById("table-sheet-1-elem"),
   tbodySheet1: document.getElementById("tbody-sheet-1"),
   tableSearch: document.getElementById("table-search"),
@@ -112,9 +126,11 @@ const elements = {
   chkFallbackSku: document.getElementById("chk-fallback-sku"),
   chkScrapeVariants: document.getElementById("chk-scrape-variants"),
   chkDownloadImages: document.getElementById("chk-download-images"),
+  rangeMaxImages: document.getElementById("range-max-images"),
+  valMaxImages: document.getElementById("val-max-images"),
   txtCustomExcludes: document.getElementById("txt-custom-excludes"),
 
-  // Browser & Resources
+  // Browser, Speed & Resources
   badgeChrome: document.getElementById("badge-chrome"),
   badgeMsedge: document.getElementById("badge-msedge"),
   badgeBrave: document.getElementById("badge-brave"),
@@ -124,6 +140,14 @@ const elements = {
   btnInstallChromium: document.getElementById("btn-install-chromium"),
   installProgressBox: document.getElementById("install-progress-box"),
   installLog: document.getElementById("install-log"),
+  chkBlockTrackers: document.getElementById("chk-block-trackers"),
+  rangeRequestDelay: document.getElementById("range-request-delay"),
+  valRequestDelay: document.getElementById("val-request-delay"),
+  rangePageTimeout: document.getElementById("range-page-timeout"),
+  valPageTimeout: document.getElementById("val-page-timeout"),
+  chkSoundComplete: document.getElementById("chk-sound-complete"),
+  chkAutoOpenExcel: document.getElementById("chk-auto-open-excel"),
+  btnResetSettings: document.getElementById("btn-reset-settings"),
   gaugeCpuText: document.getElementById("gauge-cpu-text"),
   gaugeCpuBar: document.getElementById("gauge-cpu-bar"),
   gaugeRamText: document.getElementById("gauge-ram-text"),
@@ -365,16 +389,16 @@ const updateReadinessPills = () => {
 
   elements.pillReadyProducts.classList.toggle("ready", hasProducts);
   elements.pillReadyProductsText.textContent = hasProducts
-    ? (inputMode === "manual" ? `${parseManualProducts().length} products ready` : "Input .xlsx ready")
-    : "Add products";
+    ? (inputMode === "manual" ? `${parseManualProducts().length} products` : "Excel ready")
+    : "Products";
 
   elements.pillReadyWebsites.classList.toggle("ready", websiteCount > 0);
   elements.pillReadyWebsitesText.textContent = websiteCount > 0
     ? `${websiteCount} website${websiteCount === 1 ? "" : "s"}`
-    : "Add websites";
+    : "Websites";
 
   elements.pillReadyFolder.classList.toggle("ready", hasFolder);
-  elements.pillReadyFolderText.textContent = hasFolder ? "Image folder ready" : "Select image folder";
+  elements.pillReadyFolderText.textContent = hasFolder ? "Image folder ready" : "Image folder";
 };
 
 elements.pillReadyProducts.addEventListener("click", () => {
@@ -409,7 +433,7 @@ elements.btnToggleSidebar.addEventListener("click", () => {
   setSidebarCollapsed(!elements.sidebar.classList.contains("collapsed"), true);
 });
 
-// Keyboard Shortcuts (Esc, Cmd/Ctrl+1..6, Cmd/Ctrl+K, Cmd/Ctrl+B)
+// Keyboard Shortcuts (Esc, Cmd/Ctrl+1..6, Cmd/Ctrl+K Quick Jump, Cmd/Ctrl+B Sidebar)
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !elements.productDrawer.classList.contains("hidden")) {
     closeProductDrawer();
@@ -423,14 +447,112 @@ window.addEventListener("keydown", (e) => {
       switchTab(tabOrder[num - 1]);
     } else if (e.key.toLowerCase() === "k") {
       e.preventDefault();
-      switchTab("tab-results");
-      elements.tableSearch.focus();
+      openCmdK();
     } else if (e.key.toLowerCase() === "b") {
       e.preventDefault();
       setSidebarCollapsed(!elements.sidebar.classList.contains("collapsed"), true);
     }
   }
 });
+
+// Quick Jump Command Palette (Cmd/Ctrl+K)
+let cmdkSelectedIdx = 0;
+let cmdkFiltered = [];
+
+const getCmdkItems = () => [
+  { label: "Run", cat: "Workspace", run: () => switchTab("tab-run") },
+  { label: "Results Table", cat: "Workspace", run: () => switchTab("tab-results") },
+  { label: "Activity Logs", cat: "Workspace", run: () => switchTab("tab-logs") },
+  { label: "Websites & Matching Rules", cat: "Settings", run: () => switchTab("tab-websites") },
+  { label: "Browser, Speed & Limits", cat: "Settings", run: () => switchTab("tab-resources") },
+  { label: "AI & Store Brand", cat: "Settings", run: () => switchTab("tab-gemini") },
+  { label: "Switch to Manual Product List", cat: "Run", run: () => { switchTab("tab-run"); setInputMode("manual", true); elements.manualQuickInput.focus(); } },
+  { label: "Switch to Excel File Mode", cat: "Run", run: () => { switchTab("tab-run"); setInputMode("file", true); } },
+  { label: "Politeness Delay (Rate-Limit Pacing)", cat: "Speed", run: () => { switchTab("tab-resources"); elements.rangeRequestDelay.focus(); } },
+  { label: "Page Timeout", cat: "Speed", run: () => { switchTab("tab-resources"); elements.rangePageTimeout.focus(); } },
+  { label: "Block 3rd-Party Trackers & Ads", cat: "Speed", run: () => { switchTab("tab-resources"); elements.chkBlockTrackers.focus(); } },
+  { label: "Max Images Per Product", cat: "Rules", run: () => { switchTab("tab-websites"); elements.rangeMaxImages.focus(); } },
+  { label: "Custom Exclude Keywords", cat: "Rules", run: () => { switchTab("tab-websites"); elements.txtCustomExcludes.focus(); } },
+  { label: "Gemini API Key", cat: "AI", run: () => { switchTab("tab-gemini"); elements.geminiApiKey.focus(); } },
+  { label: "Open Output Excel (.xlsx)", cat: "Action", run: () => elements.btnOpenExcelTop.click() },
+  { label: "Open Image Folder", cat: "Action", run: () => elements.btnOpenFolderTop.click() },
+  { label: "Retry Not Found Products", cat: "Action", run: () => retryNotFoundProducts() },
+  { label: "Toggle Dark / Light Appearance", cat: "Appearance", run: () => applyTheme(appSettings.theme === "light" ? "dark" : "light", true) },
+  { label: "Toggle Sidebar (⌘B)", cat: "Appearance", run: () => setSidebarCollapsed(!elements.sidebar.classList.contains("collapsed"), true) },
+  { label: "Reset All Settings to Defaults", cat: "Settings", run: () => elements.btnResetSettings.click() },
+];
+
+const renderCmdkList = () => {
+  const q = (elements.cmdkInput.value || "").trim().toLowerCase();
+  const all = getCmdkItems();
+  cmdkFiltered = q
+    ? all.filter((it) => `${it.label} ${it.cat}`.toLowerCase().includes(q))
+    : all;
+  if (cmdkSelectedIdx >= cmdkFiltered.length) cmdkSelectedIdx = 0;
+
+  if (cmdkFiltered.length === 0) {
+    elements.cmdkList.innerHTML = `<li class="cmdk-empty">No matching commands</li>`;
+    return;
+  }
+  elements.cmdkList.innerHTML = cmdkFiltered
+    .map((it, idx) => `<li class="cmdk-item${idx === cmdkSelectedIdx ? " active" : ""}" data-cmdk-idx="${idx}">
+      <span>${escapeHtml(it.label)}</span>
+      <span class="cmdk-item-cat">${escapeHtml(it.cat)}</span>
+    </li>`)
+    .join("");
+};
+
+const openCmdK = () => {
+  if (!elements.cmdkDialog) return;
+  elements.cmdkInput.value = "";
+  cmdkSelectedIdx = 0;
+  renderCmdkList();
+  if (!elements.cmdkDialog.open) elements.cmdkDialog.showModal();
+  elements.cmdkInput.focus();
+};
+
+const runCmdkIndex = (idx) => {
+  const item = cmdkFiltered[idx];
+  if (elements.cmdkDialog.open) elements.cmdkDialog.close();
+  if (item) item.run();
+};
+
+if (elements.btnOpenCmdk) elements.btnOpenCmdk.addEventListener("click", openCmdK);
+if (elements.cmdkInput) {
+  elements.cmdkInput.addEventListener("input", () => {
+    cmdkSelectedIdx = 0;
+    renderCmdkList();
+  });
+  elements.cmdkInput.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (cmdkFiltered.length) {
+        cmdkSelectedIdx = (cmdkSelectedIdx + 1) % cmdkFiltered.length;
+        renderCmdkList();
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (cmdkFiltered.length) {
+        cmdkSelectedIdx = (cmdkSelectedIdx - 1 + cmdkFiltered.length) % cmdkFiltered.length;
+        renderCmdkList();
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      runCmdkIndex(cmdkSelectedIdx);
+    }
+  });
+}
+if (elements.cmdkList) {
+  elements.cmdkList.addEventListener("click", (e) => {
+    const li = e.target.closest(".cmdk-item");
+    if (li) runCmdkIndex(parseInt(li.getAttribute("data-cmdk-idx"), 10));
+  });
+}
+if (elements.cmdkDialog) {
+  elements.cmdkDialog.addEventListener("click", (e) => {
+    if (e.target === elements.cmdkDialog) elements.cmdkDialog.close();
+  });
+}
 
 // Theme Segmented Switcher
 const applyTheme = (theme, persist = true) => {
@@ -447,7 +569,7 @@ const applyTheme = (theme, persist = true) => {
 elements.btnThemeDark.addEventListener("click", () => applyTheme("dark", true));
 elements.btnThemeLight.addEventListener("click", () => applyTheme("light", true));
 
-// Input Mode Switcher & Manual Product Counter
+// Input Mode Switcher & Things 3-Style Manual Product Composer
 const parseManualProducts = () => {
   const rawText = (elements.manualProductsInput.value || "").trim();
   if (!rawText) return [];
@@ -457,9 +579,87 @@ const parseManualProducts = () => {
     .filter(Boolean);
 };
 
+const setManualProductsList = (items, persist = true) => {
+  elements.manualProductsInput.value = items.join("\n");
+  updateManualCountBadge();
+  renderManualQueue();
+  if (persist) saveCurrentSettings();
+};
+
+const renderManualQueue = () => {
+  if (!elements.manualProductList) return;
+  const items = parseManualProducts();
+  elements.manualQueueEmpty.classList.toggle("hidden", items.length > 0);
+  elements.manualProductList.innerHTML = items
+    .map((name, idx) => `<li class="composer-item" data-idx="${idx}">
+      <span class="composer-item-idx">${idx + 1}</span>
+      <span class="composer-item-name" title="Double-click to edit" ondblclick="editManualProduct(${idx})">${escapeHtml(name)}</span>
+      <button class="composer-item-remove" type="button" title="Remove" onclick="removeManualProduct(${idx})">&times;</button>
+    </li>`)
+    .join("");
+};
+
+window.removeManualProduct = (idx) => {
+  const items = parseManualProducts();
+  if (idx < 0 || idx >= items.length) return;
+  items.splice(idx, 1);
+  setManualProductsList(items, true);
+};
+
+window.editManualProduct = (idx) => {
+  const li = elements.manualProductList.querySelector(`li[data-idx="${idx}"]`);
+  if (!li) return;
+  const items = parseManualProducts();
+  const cur = items[idx] || "";
+  const span = li.querySelector(".composer-item-name");
+  if (!span) return;
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.className = "composer-item-edit";
+  inp.value = cur;
+  span.replaceWith(inp);
+  inp.focus();
+  inp.select();
+
+  const commit = () => {
+    const next = inp.value.trim();
+    if (next) items[idx] = next;
+    else items.splice(idx, 1);
+    setManualProductsList(items, true);
+  };
+  inp.addEventListener("blur", commit);
+  inp.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); inp.blur(); }
+    if (e.key === "Escape") { renderManualQueue(); }
+  });
+};
+
+const addManualProducts = (rawText) => {
+  const incoming = (rawText || "")
+    .split(/[\n,]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (incoming.length === 0) return 0;
+
+  const existing = parseManualProducts();
+  const seen = new Set(existing.map((s) => s.toLowerCase()));
+  let added = 0;
+  for (const name of incoming) {
+    if (!seen.has(name.toLowerCase())) {
+      seen.add(name.toLowerCase());
+      existing.push(name);
+      added++;
+    }
+  }
+  setManualProductsList(existing, true);
+  if (added === 0) showToast("Already in list", "info");
+  else if (incoming.length > 1) showToast(`Added ${added} product${added === 1 ? "" : "s"}`, "success");
+  return added;
+};
+
 const updateManualCountBadge = () => {
   const count = parseManualProducts().length;
-  elements.manualProductCount.textContent = `${count} product${count === 1 ? "" : "s"} ready`;
+  elements.manualProductCount.textContent = `${count} product${count === 1 ? "" : "s"}`;
 };
 
 const setInputMode = (mode, persist = true) => {
@@ -472,9 +672,10 @@ const setInputMode = (mode, persist = true) => {
   elements.manualInputGroup.classList.toggle("hidden", !isManual);
   elements.fileInputGroup.classList.toggle("hidden", isManual);
   elements.configModeHint.textContent = isManual
-    ? "Type or paste one product per line — no input .xlsx file needed"
-    : "Reads product names from Column A of your spreadsheet";
+    ? "No input .xlsx file needed"
+    : "Column A of your .xlsx file";
   updateManualCountBadge();
+  renderManualQueue();
   if (persist) saveCurrentSettings();
 };
 
@@ -484,11 +685,8 @@ elements.btnModeManual.addEventListener("click", () => setInputMode("manual", tr
 const appendQuickProduct = () => {
   const val = (elements.manualQuickInput.value || "").trim();
   if (!val) return;
-  const current = (elements.manualProductsInput.value || "").trim();
-  elements.manualProductsInput.value = current ? `${current}\n${val}` : val;
+  addManualProducts(val);
   elements.manualQuickInput.value = "";
-  updateManualCountBadge();
-  saveCurrentSettings();
 };
 
 elements.btnManualQuickAdd.addEventListener("click", appendQuickProduct);
@@ -498,25 +696,89 @@ elements.manualQuickInput.addEventListener("keydown", (e) => {
     appendQuickProduct();
   }
 });
-
-elements.manualProductsInput.addEventListener("input", updateManualCountBadge);
-
-elements.btnClearManual.addEventListener("click", () => {
-  elements.manualProductsInput.value = "";
-  elements.manualQuickInput.value = "";
-  updateManualCountBadge();
-  saveCurrentSettings();
-  showToast("Manual product list cleared", "info");
+elements.manualQuickInput.addEventListener("paste", (e) => {
+  const pasted = (e.clipboardData || window.clipboardData)?.getData("text") || "";
+  if (pasted.includes("\n") || pasted.includes(",")) {
+    e.preventDefault();
+    addManualProducts(pasted);
+    elements.manualQuickInput.value = "";
+  }
 });
 
-// Progress & KPIs
+if (elements.btnPasteClipboard) {
+  elements.btnPasteClipboard.addEventListener("click", async () => {
+    try {
+      const txt = await navigator.clipboard.readText();
+      if (!txt.trim()) return showToast("Clipboard is empty", "warning");
+      addManualProducts(txt);
+    } catch {
+      showToast("Press ⌘V inside the add bar to paste", "info");
+      elements.manualQuickInput.focus();
+    }
+  });
+}
+
+if (elements.btnToggleBulkMode) {
+  elements.btnToggleBulkMode.addEventListener("click", () => {
+    isBulkEditMode = !isBulkEditMode;
+    elements.manualQueueWrap.classList.toggle("hidden", isBulkEditMode);
+    elements.manualBulkWrap.classList.toggle("hidden", !isBulkEditMode);
+    elements.btnToggleBulkMode.textContent = isBulkEditMode ? "List View" : "Bulk Edit";
+    if (!isBulkEditMode) {
+      renderManualQueue();
+      saveCurrentSettings();
+    } else {
+      elements.manualProductsInput.focus();
+    }
+  });
+}
+
+elements.manualProductsInput.addEventListener("input", () => {
+  updateManualCountBadge();
+  renderManualQueue();
+});
+
+elements.btnClearManual.addEventListener("click", () => {
+  elements.manualQuickInput.value = "";
+  setManualProductsList([], true);
+  showToast("Product list cleared", "info");
+});
+
+// Progress, Live Pace/ETA & KPIs
+const formatEta = (sec) => {
+  if (!isFinite(sec) || sec <= 0) return "";
+  if (sec < 60) return `${Math.ceil(sec)}s`;
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}m ${s}s`;
+};
+
 const updateProgressUI = ({ current, total, product_name, stage }) => {
   const pct = total > 0 ? Math.round((current / total) * 100) : 0;
-  elements.progressStatusLabel.textContent = `${current} / ${total} Products (${pct}%)`;
-  elements.progressSiteLabel.textContent = product_name ? `${product_name} • ${stage}` : "Idle";
+  let etaPart = "";
+  if (runStartedAtMs > 0 && current > 0 && current < total) {
+    const elapsedSec = (Date.now() - runStartedAtMs) / 1000;
+    const perItem = elapsedSec / current;
+    const remSec = perItem * (total - current);
+    etaPart = ` · ~${perItem.toFixed(1)}s/item · ETA ${formatEta(remSec)}`;
+  }
+  elements.progressStatusLabel.textContent = `${current} / ${total} (${pct}%)${etaPart}`;
+  elements.progressSiteLabel.textContent = product_name ? `${product_name} · ${stage}` : "Idle";
   elements.mainProgressBar.style.width = `${pct}%`;
   elements.headerMiniProgress.textContent = `${current} / ${total}`;
 };
+
+const retryNotFoundProducts = () => {
+  const missed = Array.from(productsMap.values())
+    .filter((r) => r.status === "Not Found")
+    .map((r) => r.product_name);
+  if (missed.length === 0) return showToast("No Not Found products to retry", "info");
+  setManualProductsList(missed, true);
+  setInputMode("manual", true);
+  switchTab("tab-run");
+  showToast(`Loaded ${missed.length} Not Found product${missed.length === 1 ? "" : "s"} into Manual List`, "success");
+};
+if (elements.btnRetryNotFound) elements.btnRetryNotFound.addEventListener("click", retryNotFoundProducts);
 
 const updateKpiStrip = () => {
   const all = Array.from(productsMap.values());
@@ -535,6 +797,9 @@ const updateKpiStrip = () => {
   elements.kpiNotFound.textContent = String(notFound);
   elements.kpiVariants.textContent = String(totalVariants);
   elements.navResultsCount.textContent = String(all.length);
+  if (elements.btnRetryNotFound) {
+    elements.btnRetryNotFound.classList.toggle("hidden", notFound === 0 || isScrapingRunning);
+  }
 };
 
 // Update Row in Table
@@ -565,23 +830,14 @@ const renderSheet1 = () => {
     return matchesSearch && matchesStatus;
   });
 
-  elements.tableRowCount.textContent = `${records.length} product${records.length === 1 ? "" : "s"}`;
+  elements.tableRowCount.textContent = `${records.length}`;
 
   if (records.length === 0) {
     elements.tbodySheet1.innerHTML = `<tr>
       <td colspan="9" class="empty-state-cell">
         <div class="empty-state-box">
-          <div class="empty-state-icon" aria-hidden="true">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-          </div>
-          <div class="empty-state-title">${productsMap.size === 0 ? "No products loaded yet" : "No matching products"}</div>
-          <div class="empty-state-steps">
-            <span>1. Upload .xlsx or enter products manually</span>
-            <span class="step-arrow">&rarr;</span>
-            <span>2. Add stores in Websites Waterfall</span>
-            <span class="step-arrow">&rarr;</span>
-            <span>3. Click Start Scraping</span>
-          </div>
+          <div class="empty-state-title">${productsMap.size === 0 ? "No products yet" : "No matching products"}</div>
+          <div class="empty-state-sub">${productsMap.size === 0 ? "Add products in Run, configure a store in Websites, and press Start." : "Try clearing your search or status filter."}</div>
         </div>
       </td>
     </tr>`;
@@ -825,36 +1081,36 @@ const updateAppStatus = (status) => {
   elements.statusBadgeText.textContent = status;
 
   if (status === "Running") {
+    if (!isScrapingRunning) runStartedAtMs = Date.now();
     isScrapingRunning = true;
     isScrapingPaused = false;
     elements.btnStart.disabled = true;
     elements.btnPause.disabled = false;
-    elements.btnPause.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>Pause</span>`;
+    elements.btnPause.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>Pause</span>`;
     elements.btnStop.disabled = false;
     elements.headerLiveControls.classList.remove("hidden");
     elements.btnHeaderPause.textContent = "Pause";
-    elements.mainProgressBar.classList.add("active-shimmer");
-    elements.statusDescription.textContent = "Scraping active in visible Incognito browser...";
+    elements.statusDescription.textContent = "Running in visible Incognito browser";
   } else if (status === "Paused") {
     isScrapingPaused = true;
-    elements.btnPause.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>Resume</span>`;
+    elements.btnPause.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg><span>Resume</span>`;
     elements.headerLiveControls.classList.remove("hidden");
     elements.btnHeaderPause.textContent = "Resume";
-    elements.mainProgressBar.classList.remove("active-shimmer");
-    elements.statusDescription.textContent = "Paused cleanly at checkpoint.";
+    elements.statusDescription.textContent = "Paused";
   } else {
     isScrapingRunning = false;
     isScrapingPaused = false;
+    runStartedAtMs = 0;
     elements.btnStart.disabled = false;
     elements.btnPause.disabled = true;
     elements.btnStop.disabled = true;
     elements.headerLiveControls.classList.add("hidden");
-    elements.mainProgressBar.classList.remove("active-shimmer");
     elements.captchaBanner.classList.add("hidden");
-    elements.statusDescription.textContent = status === "Finished" ? "Scraping complete — all rows saved." : "Ready to scrape";
+    elements.statusDescription.textContent = status === "Finished" ? "Done — all rows saved" : "Ready";
+    updateKpiStrip();
     if (status === "Finished") {
-      playAlertChime();
-      showToast("Scraping finished! All rows saved to Excel.", "success");
+      if (appSettings.sound_on_complete !== false) playAlertChime();
+      showToast("Done — all rows saved to Excel", "success");
     }
   }
 };
@@ -1079,6 +1335,40 @@ elements.rangeRamGb.addEventListener("input", (e) => {
   saveCurrentSettings();
 });
 
+elements.rangeMaxImages.addEventListener("input", (e) => {
+  const v = parseInt(e.target.value, 10);
+  elements.valMaxImages.textContent = v === 0 ? "Unlimited" : `${v} max`;
+  appSettings.max_images_per_product = v;
+  saveCurrentSettings();
+});
+
+elements.rangeRequestDelay.addEventListener("input", (e) => {
+  const v = parseFloat(e.target.value);
+  elements.valRequestDelay.textContent = `${v.toFixed(1)}s`;
+  appSettings.request_delay_sec = v;
+  saveCurrentSettings();
+});
+
+elements.rangePageTimeout.addEventListener("input", (e) => {
+  const v = parseInt(e.target.value, 10);
+  elements.valPageTimeout.textContent = `${v}s`;
+  appSettings.page_timeout_sec = v;
+  saveCurrentSettings();
+});
+
+elements.btnResetSettings.addEventListener("click", async () => {
+  const ok = await showConfirmDialog(
+    "Reset All Settings?",
+    "Restores matching rules, limits, browser preferences, and store profile to factory defaults."
+  );
+  if (!ok) return;
+  const fresh = await callApi("reset_settings");
+  if (fresh) {
+    loadSettingsIntoUI(fresh);
+    showToast("Settings reset to defaults", "info");
+  }
+});
+
 elements.selBrowserMode.addEventListener("change", (e) => {
   appSettings.browser_mode = e.target.value;
   elements.customBrowserGroup.classList.toggle("hidden", e.target.value !== "custom");
@@ -1124,7 +1414,7 @@ elements.btnToggleKeyVisibility.addEventListener("click", () => {
 
 const syncSidebarSubtitle = () => {
   const name = (elements.brandName.value || "").trim();
-  elements.sidebarBrandSubtitle.textContent = name || "Catalog Intelligence";
+  elements.sidebarBrandSubtitle.textContent = name;
 };
 elements.brandName.addEventListener("input", syncSidebarSubtitle);
 
@@ -1152,6 +1442,11 @@ const saveCurrentSettings = () => {
   appSettings.last_output_xlsx = elements.outputXlsxPath.value;
   appSettings.browser_mode = elements.selBrowserMode.value;
   appSettings.custom_browser_path = elements.customBrowserPath.value;
+  appSettings.block_trackers = elements.chkBlockTrackers.checked;
+  appSettings.request_delay_sec = parseFloat(elements.rangeRequestDelay.value);
+  appSettings.page_timeout_sec = parseInt(elements.rangePageTimeout.value, 10);
+  appSettings.sound_on_complete = elements.chkSoundComplete.checked;
+  appSettings.auto_open_excel = elements.chkAutoOpenExcel.checked;
   appSettings.search_missing_official_unofficial_pair = elements.chkMissingOfficialPair.checked;
   appSettings.skip_preowned_devices = elements.chkSkipPreowned.checked;
   appSettings.skip_accessories = elements.chkSkipAccessories.checked;
@@ -1159,6 +1454,7 @@ const saveCurrentSettings = () => {
   appSettings.enable_fallback_sku_search = elements.chkFallbackSku.checked;
   appSettings.scrape_variants = elements.chkScrapeVariants.checked;
   appSettings.download_images = elements.chkDownloadImages.checked;
+  appSettings.max_images_per_product = parseInt(elements.rangeMaxImages.value, 10);
   appSettings.custom_exclude_keywords = elements.txtCustomExcludes.value;
   appSettings.sidebar_collapsed = elements.sidebar.classList.contains("collapsed");
   appSettings.enable_gemini = elements.chkEnableGemini.checked;
@@ -1179,6 +1475,9 @@ const saveCurrentSettings = () => {
 [
   elements.manualProductsInput,
   elements.customBrowserPath,
+  elements.chkBlockTrackers,
+  elements.chkSoundComplete,
+  elements.chkAutoOpenExcel,
   elements.chkMissingOfficialPair,
   elements.chkSkipPreowned,
   elements.chkSkipAccessories,
@@ -1228,7 +1527,20 @@ const loadSettingsIntoUI = (s) => {
   elements.chkFallbackSku.checked = s.enable_fallback_sku_search ?? true;
   elements.chkScrapeVariants.checked = s.scrape_variants ?? true;
   elements.chkDownloadImages.checked = s.download_images ?? true;
+  const maxImgs = Number(s.max_images_per_product ?? 0);
+  elements.rangeMaxImages.value = maxImgs;
+  elements.valMaxImages.textContent = maxImgs === 0 ? "Unlimited" : `${maxImgs} max`;
   elements.txtCustomExcludes.value = s.custom_exclude_keywords || "";
+
+  elements.chkBlockTrackers.checked = s.block_trackers ?? true;
+  const reqDelay = Number(s.request_delay_sec ?? 0.5);
+  elements.rangeRequestDelay.value = reqDelay;
+  elements.valRequestDelay.textContent = `${reqDelay.toFixed(1)}s`;
+  const pageTo = Number(s.page_timeout_sec ?? 25);
+  elements.rangePageTimeout.value = pageTo;
+  elements.valPageTimeout.textContent = `${pageTo}s`;
+  elements.chkSoundComplete.checked = s.sound_on_complete ?? true;
+  elements.chkAutoOpenExcel.checked = s.auto_open_excel ?? false;
   setSidebarCollapsed(Boolean(s.sidebar_collapsed), false);
 
   elements.chkEnableGemini.checked = s.enable_gemini ?? true;
@@ -1281,10 +1593,10 @@ const pollResources = async () => {
 
   const barColor = res.memory_percent_of_cap > 85
     ? "var(--danger)"
-    : (res.cpu_percent > res.max_cpu_percent ? "var(--warning)" : "linear-gradient(90deg, var(--accent-primary), var(--accent-primary-2))");
+    : (res.cpu_percent > res.max_cpu_percent ? "var(--warning)" : "var(--accent-primary)");
   elements.miniRamBar.style.background = barColor;
-  elements.gaugeRamBar.style.background = res.memory_percent_of_cap > 85 ? "var(--danger)" : "linear-gradient(90deg, var(--accent-primary), var(--accent-primary-2))";
-  elements.gaugeCpuBar.style.background = res.cpu_percent > res.max_cpu_percent ? "var(--warning)" : "linear-gradient(90deg, var(--accent-primary), var(--accent-primary-2))";
+  elements.gaugeRamBar.style.background = res.memory_percent_of_cap > 85 ? "var(--danger)" : "var(--accent-primary)";
+  elements.gaugeCpuBar.style.background = res.cpu_percent > res.max_cpu_percent ? "var(--warning)" : "var(--accent-primary)";
 };
 
 // Initialization

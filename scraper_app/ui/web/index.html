@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scraper — E-Commerce Intelligence</title>
+  <title>Scraper</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="app-layout">
-    <!-- Sidebar Navigation -->
+    <!-- Finder-Style Collapsible Source List Sidebar -->
     <aside class="sidebar" id="sidebar">
       <div class="brand-header">
         <div class="brand-logo" aria-hidden="true">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2L2 7l10 5 10-5-10-5z"/>
             <path d="M2 17l10 5 10-5"/>
             <path d="M2 12l10 5 10-5"/>
@@ -20,39 +20,42 @@
         </div>
         <div class="brand-text">
           <div class="brand-title">Scraper</div>
-          <div class="brand-subtitle" id="sidebar-brand-subtitle">Catalog Intelligence</div>
+          <div class="brand-subtitle" id="sidebar-brand-subtitle"></div>
         </div>
-        <button class="sidebar-collapse-btn" id="btn-toggle-sidebar" type="button" title="Collapse / Expand Sidebar (Cmd/Ctrl+B)" aria-label="Toggle sidebar">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        <button class="sidebar-collapse-btn" id="btn-toggle-sidebar" type="button" title="Toggle Sidebar (⌘B)" aria-label="Toggle sidebar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
       </div>
 
       <nav class="nav-menu" aria-label="Main navigation">
-        <button class="nav-item active" data-tab="tab-run" type="button" title="Launchpad (Cmd/Ctrl+1)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          <span>Launchpad</span>
+        <div class="nav-section-label">Workspace</div>
+        <button class="nav-item active" data-tab="tab-run" type="button" title="Run (⌘1)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+          <span>Run</span>
         </button>
-        <button class="nav-item" data-tab="tab-results" type="button" title="Live Results Table (Cmd/Ctrl+2)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-          <span>Live Results</span>
+        <button class="nav-item" data-tab="tab-results" type="button" title="Results (⌘2)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+          <span>Results</span>
           <span class="nav-badge" id="nav-results-count">0</span>
         </button>
-        <button class="nav-item" data-tab="tab-websites" type="button" title="Websites Waterfall (Cmd/Ctrl+3)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          <span>Websites Waterfall</span>
+        <button class="nav-item" data-tab="tab-logs" type="button" title="Logs (⌘6)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <span>Logs</span>
+        </button>
+
+        <div class="nav-section-label">Settings</div>
+        <button class="nav-item" data-tab="tab-websites" type="button" title="Websites & Rules (⌘3)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span>Websites &amp; Rules</span>
           <span class="nav-badge" id="nav-websites-count">0</span>
         </button>
-        <button class="nav-item" data-tab="tab-resources" type="button" title="Browser &amp; Limits (Cmd/Ctrl+4)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
-          <span>Browser &amp; Limits</span>
+        <button class="nav-item" data-tab="tab-resources" type="button" title="Browser & Speed (⌘4)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Browser &amp; Speed</span>
         </button>
-        <button class="nav-item" data-tab="tab-gemini" type="button" title="Brand &amp; Gemini AI (Cmd/Ctrl+5)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3z"/></svg>
-          <span>Brand &amp; Gemini AI</span>
-        </button>
-        <button class="nav-item" data-tab="tab-logs" type="button" title="Activity Log (Cmd/Ctrl+6)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-          <span>Activity Log</span>
+        <button class="nav-item" data-tab="tab-gemini" type="button" title="AI & Brand (⌘5)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3z"/></svg>
+          <span>AI &amp; Brand</span>
         </button>
       </nav>
 
@@ -65,13 +68,13 @@
           <div class="mini-progress-bar"><div class="mini-progress-fill" id="mini-ram-bar" style="width: 0%"></div></div>
         </div>
 
-        <div class="theme-segmented" role="group" aria-label="Theme">
+        <div class="theme-segmented" role="group" aria-label="Appearance">
           <button class="theme-seg-btn active" id="btn-theme-dark" type="button">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             <span>Dark</span>
           </button>
           <button class="theme-seg-btn" id="btn-theme-light" type="button">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
             <span>Light</span>
           </button>
         </div>
@@ -80,28 +83,33 @@
 
     <!-- Main Content Area -->
     <main class="main-content">
-      <!-- Top Status Header -->
+      <!-- Unified macOS Toolbar -->
       <header class="app-header">
         <div class="header-status">
           <span class="status-pill idle" id="status-badge">
             <span class="status-dot"></span>
             <span id="status-badge-text">Idle</span>
           </span>
-          <span class="status-text" id="status-description">Ready to scrape</span>
+          <span class="status-text" id="status-description">Ready</span>
         </div>
         <div class="header-actions">
+          <button class="cmdk-trigger" id="btn-open-cmdk" type="button" title="Quick Jump to any setting or action (⌘K)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span>Quick Jump…</span>
+            <kbd>⌘K</kbd>
+          </button>
           <div class="header-live-controls hidden" id="header-live-controls">
             <span class="header-mini-progress" id="header-mini-progress">0 / 0</span>
-            <button class="btn btn-warning btn-xs" id="btn-header-pause" type="button">Pause</button>
-            <button class="btn btn-danger btn-xs" id="btn-header-stop" type="button">Stop</button>
+            <button class="btn btn-secondary btn-xs btn-tint-warn" id="btn-header-pause" type="button">Pause</button>
+            <button class="btn btn-secondary btn-xs btn-tint-danger" id="btn-header-stop" type="button">Stop</button>
           </div>
           <button class="btn btn-secondary btn-sm" id="btn-open-excel-top" type="button" title="Open current Excel workbook">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             <span>Open .xlsx</span>
           </button>
           <button class="btn btn-secondary btn-sm" id="btn-open-folder-top" type="button" title="Open root image folder">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            <span>Open Images</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <span>Images</span>
           </button>
         </div>
       </header>
@@ -109,153 +117,168 @@
       <!-- CAPTCHA Notification Alert Banner -->
       <div class="captcha-banner hidden" id="captcha-banner" role="alert">
         <div class="captcha-icon" aria-hidden="true">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         </div>
         <div class="captcha-info">
-          <strong>Human Verification Required</strong>
-          <span id="captcha-site-text">A CAPTCHA challenge was detected in the visible browser window. Please verify manually.</span>
+          <strong>Verification required</strong>
+          <span id="captcha-site-text">Complete the check in the browser window, then continue.</span>
         </div>
-        <button class="btn btn-warning btn-sm" id="btn-captcha-done" type="button">I've Verified — Continue</button>
+        <button class="btn btn-primary btn-sm" id="btn-captcha-done" type="button">Continue</button>
       </div>
 
-      <!-- TAB 1: RUN & LIVE TABLE -->
+      <!-- TAB 1: RUN -->
       <section class="tab-panel active" id="tab-run">
-        <!-- Configuration Card -->
-        <div class="card config-card">
+        <div class="panel-container">
+          <!-- Input Source Switcher -->
           <div class="config-top-bar">
             <div class="input-mode-switcher" role="tablist" aria-label="Product input mode">
-              <button class="mode-btn active" id="btn-mode-file" type="button" role="tab" aria-selected="true">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <span>Upload .xlsx File</span>
-              </button>
-              <button class="mode-btn" id="btn-mode-manual" type="button" role="tab" aria-selected="false">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                <span>Enter Products Manually</span>
-              </button>
+              <button class="mode-btn active" id="btn-mode-file" type="button" role="tab" aria-selected="true">Excel File</button>
+              <button class="mode-btn" id="btn-mode-manual" type="button" role="tab" aria-selected="false">Manual List</button>
             </div>
-            <span class="config-hint" id="config-mode-hint">Reads product names from Column A of your spreadsheet</span>
+            <span class="config-hint" id="config-mode-hint">Column A of your .xlsx file</span>
           </div>
 
-          <!-- Spacious Full-Width Manual Product Entry Section -->
-          <div class="manual-entry-panel hidden" id="manual-input-group">
-            <div class="manual-entry-header">
-              <div class="manual-entry-title">
-                <label for="manual-products-input">Products to Search</label>
-                <span class="count-pill" id="manual-product-count">0 products ready</span>
+          <!-- Redesigned Things 3-Style "Products to Search" Composer -->
+          <div class="composer-card hidden" id="manual-input-group">
+            <div class="composer-bar">
+              <svg class="composer-plus-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <input type="text" id="manual-quick-input" placeholder="Add a product (Enter) or paste a multi-line list…">
+              <button class="btn btn-primary btn-xs" id="btn-manual-quick-add" type="button">Add</button>
+            </div>
+
+            <!-- Interactive Numbered Product Queue -->
+            <div class="composer-queue-wrap" id="manual-queue-wrap">
+              <ul class="composer-queue" id="manual-product-list"></ul>
+              <div class="composer-empty" id="manual-queue-empty">
+                Type a product above or paste multiple lines at once.
               </div>
-              <button class="btn btn-ghost btn-xs" id="btn-clear-manual" type="button">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                <span>Clear</span>
-              </button>
             </div>
 
-            <div class="manual-quick-add">
-              <input type="text" id="manual-quick-input" placeholder="Quick add: type a product name and press Enter (e.g. Apple AirPods Pro 2)...">
-              <button class="btn btn-secondary btn-sm" id="btn-manual-quick-add" type="button">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                <span>Add</span>
-              </button>
+            <!-- Toggleable Raw Bulk-Edit Textarea (synced 1:1 with queue) -->
+            <div class="composer-bulk-wrap hidden" id="manual-bulk-wrap">
+              <textarea id="manual-products-input" class="manual-textarea" rows="6" placeholder="One product per line or comma-separated:&#10;Apple AirPods Pro 2&#10;Anker Soundcore R60i NC"></textarea>
             </div>
 
-            <textarea id="manual-products-input" class="manual-textarea" rows="4" placeholder="Or paste multiple product names here (one per line or comma-separated):&#10;Apple AirPods Pro 2&#10;iPhone 16 Pro&#10;Anker Soundcore R60i NC"></textarea>
+            <div class="composer-footer">
+              <span class="composer-count" id="manual-product-count">0 products</span>
+              <div class="composer-footer-actions">
+                <button class="btn btn-ghost btn-xs" id="btn-paste-clipboard" type="button" title="Paste lines from clipboard">Paste</button>
+                <button class="btn btn-ghost btn-xs" id="btn-toggle-bulk-mode" type="button" title="Switch between interactive list and raw text">Bulk Edit</button>
+                <button class="btn btn-ghost btn-xs btn-tint-danger" id="btn-clear-manual" type="button">Clear</button>
+              </div>
+            </div>
           </div>
 
-          <div class="file-pickers-grid">
-            <div class="form-group" id="file-input-group">
-              <label for="input-xlsx-path">Input .xlsx File <small>(Column A)</small></label>
-              <div class="input-with-button">
-                <input type="text" id="input-xlsx-path" placeholder="Select source product list..." readonly>
-                <button class="btn btn-secondary" id="btn-browse-input" type="button">Browse</button>
+          <!-- Files & Paths Grouped Inset Card -->
+          <div class="section-label">Files &amp; Output</div>
+          <div class="inset-group">
+            <div class="inset-field-row" id="file-input-group">
+              <div class="inset-field-label">
+                <label for="input-xlsx-path">Input Excel</label>
+                <span>Column A product names</span>
+              </div>
+              <div class="inset-field-control">
+                <input type="text" id="input-xlsx-path" placeholder="Choose .xlsx file…" readonly>
+                <button class="btn btn-secondary btn-sm" id="btn-browse-input" type="button">Browse…</button>
               </div>
             </div>
 
-            <div class="form-group">
-              <label for="output-xlsx-path">Output .xlsx File <small>(Saves incrementally)</small></label>
-              <div class="input-with-button">
-                <input type="text" id="output-xlsx-path" placeholder="Auto-defaults in manual mode, or choose path..." readonly>
-                <button class="btn btn-secondary" id="btn-browse-output" type="button">Choose</button>
+            <div class="inset-field-row">
+              <div class="inset-field-label">
+                <label for="output-xlsx-path">Output Excel</label>
+                <span>Saves after every product</span>
+              </div>
+              <div class="inset-field-control">
+                <input type="text" id="output-xlsx-path" placeholder="Auto-generated if left blank" readonly>
+                <button class="btn btn-secondary btn-sm" id="btn-browse-output" type="button">Choose…</button>
               </div>
             </div>
 
-            <div class="form-group">
-              <label for="root-folder-path">Root Image Folder <small>(Subfolder per product)</small></label>
-              <div class="input-with-button">
-                <input type="text" id="root-folder-path" placeholder="Select folder for full-res JPEG images..." readonly>
-                <button class="btn btn-secondary" id="btn-browse-folder" type="button">Browse</button>
+            <div class="inset-field-row">
+              <div class="inset-field-label">
+                <label for="root-folder-path">Image Folder</label>
+                <span>Subfolder per product</span>
+              </div>
+              <div class="inset-field-control">
+                <input type="text" id="root-folder-path" placeholder="Choose folder…" readonly>
+                <button class="btn btn-secondary btn-sm" id="btn-browse-folder" type="button">Browse…</button>
               </div>
             </div>
 
-            <div class="form-group">
-              <label for="resume-xlsx-path">Resume Existing Run <small>(Optional)</small></label>
-              <div class="input-with-button">
-                <input type="text" id="resume-xlsx-path" placeholder="Pick a partially completed output .xlsx..." readonly>
-                <button class="btn btn-secondary" id="btn-browse-resume" type="button">Resume</button>
-                <button class="btn btn-ghost btn-icon" id="btn-clear-resume" type="button" title="Clear resume file">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <div class="inset-field-row">
+              <div class="inset-field-label">
+                <label for="resume-xlsx-path">Resume Run</label>
+                <span>Optional partial .xlsx</span>
+              </div>
+              <div class="inset-field-control">
+                <input type="text" id="resume-xlsx-path" placeholder="None" readonly>
+                <button class="btn btn-secondary btn-sm" id="btn-browse-resume" type="button">Choose…</button>
+                <button class="btn btn-ghost btn-icon btn-sm" id="btn-clear-resume" type="button" title="Clear resume file">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
               </div>
             </div>
           </div>
 
-          <!-- Pre-Flight Readiness Pills -->
-          <div class="readiness-strip" id="readiness-strip">
-            <button class="readiness-pill missing" id="pill-ready-products" type="button">
-              <span class="readiness-dot"></span>
-              <span id="pill-ready-products-text">Add products</span>
-            </button>
-            <button class="readiness-pill missing" id="pill-ready-websites" type="button">
-              <span class="readiness-dot"></span>
-              <span id="pill-ready-websites-text">Add websites</span>
-            </button>
-            <button class="readiness-pill missing" id="pill-ready-folder" type="button">
-              <span class="readiness-dot"></span>
-              <span id="pill-ready-folder-text">Select image folder</span>
-            </button>
-            <button class="btn btn-ghost btn-xs" id="btn-jump-results" type="button" style="margin-left: auto;">
-              <span>View Live Results &rarr;</span>
-            </button>
-          </div>
-
-          <!-- Controls Toolbar -->
-          <div class="controls-toolbar">
-            <div class="playback-buttons">
-              <button class="btn btn-primary btn-lg" id="btn-start" type="button">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                <span>Start Scraping</span>
+          <!-- Pre-Flight Checklist + Playback Controls -->
+          <div class="run-dock">
+            <div class="readiness-strip" id="readiness-strip">
+              <button class="readiness-pill missing" id="pill-ready-products" type="button">
+                <span class="readiness-dot"></span>
+                <span id="pill-ready-products-text">Products</span>
               </button>
-              <button class="btn btn-warning btn-lg" id="btn-pause" type="button" disabled>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                <span>Pause</span>
+              <button class="readiness-pill missing" id="pill-ready-websites" type="button">
+                <span class="readiness-dot"></span>
+                <span id="pill-ready-websites-text">Websites</span>
               </button>
-              <button class="btn btn-danger btn-lg" id="btn-stop" type="button" disabled>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-                <span>Stop</span>
+              <button class="readiness-pill missing" id="pill-ready-folder" type="button">
+                <span class="readiness-dot"></span>
+                <span id="pill-ready-folder-text">Image folder</span>
+              </button>
+              <button class="btn btn-ghost btn-xs" id="btn-jump-results" type="button" style="margin-left: auto;">
+                <span>Results &rarr;</span>
               </button>
             </div>
 
-            <div class="overall-progress-box">
-              <div class="progress-labels">
-                <span id="progress-status-label">0 / 0 Products (0%)</span>
-                <span id="progress-site-label">Idle</span>
+            <div class="controls-toolbar">
+              <div class="playback-buttons">
+                <button class="btn btn-primary" id="btn-start" type="button">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+                  <span>Start</span>
+                </button>
+                <button class="btn btn-secondary btn-tint-warn" id="btn-pause" type="button" disabled>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                  <span>Pause</span>
+                </button>
+                <button class="btn btn-secondary btn-tint-danger" id="btn-stop" type="button" disabled>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                  <span>Stop</span>
+                </button>
               </div>
-              <div class="progress-track">
-                <div class="progress-bar" id="main-progress-bar" style="width: 0%"></div>
+
+              <div class="overall-progress-box">
+                <div class="progress-labels">
+                  <span id="progress-status-label">0 / 0 (0%)</span>
+                  <span id="progress-site-label">Idle</span>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-bar" id="main-progress-bar" style="width: 0%"></div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- TAB 2: DEDICATED FULL-HEIGHT LIVE RESULTS -->
+      <!-- TAB 2: RESULTS -->
       <section class="tab-panel" id="tab-results">
-        <!-- Clickable KPI Filter Strip -->
         <div class="kpi-strip">
           <button class="kpi-card clickable active-filter" id="kpi-filter-all" data-status-filter="all" type="button">
-            <span class="kpi-label">Total Products</span>
+            <span class="kpi-label">Total</span>
             <strong class="kpi-value" id="kpi-total">0</strong>
           </button>
           <button class="kpi-card clickable" id="kpi-filter-done" data-status-filter="Done" type="button">
-            <span class="kpi-label"><span class="kpi-dot success"></span>Completed</span>
+            <span class="kpi-label"><span class="kpi-dot success"></span>Done</span>
             <strong class="kpi-value" id="kpi-done">0</strong>
           </button>
           <button class="kpi-card clickable" id="kpi-filter-not-found" data-status-filter="Not Found" type="button">
@@ -263,24 +286,24 @@
             <strong class="kpi-value" id="kpi-not-found">0</strong>
           </button>
           <div class="kpi-card">
-            <span class="kpi-label"><span class="kpi-dot accent"></span>Variants Captured</span>
+            <span class="kpi-label"><span class="kpi-dot accent"></span>Variants</span>
             <strong class="kpi-value" id="kpi-variants">0</strong>
           </div>
         </div>
 
-        <!-- Full-Height Live Spreadsheet Card -->
         <div class="card table-card">
           <div class="table-card-header">
             <div class="table-header-title">
-              <strong>Products Live Table</strong>
-              <span class="table-header-hint">Click a variant dropdown to expand options, or click a row to inspect full specs &amp; HTML</span>
+              <strong>Products</strong>
+              <span class="table-header-hint">Click a row to inspect</span>
             </div>
             <div class="table-tools">
+              <button class="btn btn-secondary btn-xs hidden" id="btn-retry-not-found" type="button" title="Load Not Found products into Manual List to retry">Retry Not Found</button>
               <div class="search-input-wrap">
-                <svg class="search-icon-inline" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input type="text" class="table-search-input" id="table-search" placeholder="Filter products...">
+                <svg class="search-icon-inline" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" class="table-search-input" id="table-search" placeholder="Filter…">
               </div>
-              <span class="row-count-badge" id="table-row-count">0 products</span>
+              <span class="row-count-badge" id="table-row-count">0</span>
             </div>
           </div>
 
@@ -288,14 +311,14 @@
             <table class="live-table" id="table-sheet-1-elem">
               <thead>
                 <tr>
-                  <th>Product Name</th>
+                  <th>Product</th>
                   <th>Status</th>
-                  <th>Regular Price</th>
-                  <th>Discounted Price</th>
+                  <th>Regular</th>
+                  <th>Discounted</th>
                   <th>Variants</th>
-                  <th>Image Folder</th>
-                  <th>Page Link</th>
-                  <th>Specifications</th>
+                  <th>Images</th>
+                  <th>Link</th>
+                  <th>Specs</th>
                   <th>Description</th>
                 </tr>
               </thead>
@@ -303,17 +326,8 @@
                 <tr>
                   <td colspan="9" class="empty-state-cell">
                     <div class="empty-state-box">
-                      <div class="empty-state-icon" aria-hidden="true">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-                      </div>
-                      <div class="empty-state-title">No products loaded yet</div>
-                      <div class="empty-state-steps">
-                        <span>1. Upload .xlsx or enter products manually</span>
-                        <span class="step-arrow">&rarr;</span>
-                        <span>2. Add stores in Websites Waterfall</span>
-                        <span class="step-arrow">&rarr;</span>
-                        <span>3. Click Start Scraping</span>
-                      </div>
+                      <div class="empty-state-title">No products yet</div>
+                      <div class="empty-state-sub">Add products in Run, configure at least one store in Websites, and press Start.</div>
                     </div>
                   </td>
                 </tr>
@@ -323,32 +337,26 @@
         </div>
       </section>
 
-      <!-- TAB 2: WEBSITES WATERFALL -->
+      <!-- TAB 3: WEBSITES & RULES -->
       <section class="tab-panel" id="tab-websites">
-        <div class="card">
-          <div class="card-header">
-            <h2>Website Search Hierarchy</h2>
-            <p>Scraper searches Website #1 first, records all details, then checks Website #2+ only for missing rows or missing variants. Add unlimited websites in priority order.</p>
+        <div class="panel-container">
+          <div class="section-label">Websites (Searched Top to Bottom)</div>
+          <div class="inset-group">
+            <div class="inset-add-bar">
+              <input type="url" id="new-website-url" placeholder="https://www.applegadgetsbd.com">
+              <button class="btn btn-primary btn-sm" id="btn-add-website" type="button">Add</button>
+            </div>
+            <ul class="website-list" id="website-list">
+              <!-- Rendered dynamically -->
+            </ul>
           </div>
 
-          <div class="add-website-bar">
-            <input type="url" id="new-website-url" placeholder="https://www.applegadgetsbd.com">
-            <button class="btn btn-primary" id="btn-add-website" type="button">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              <span>Add Website</span>
-            </button>
-          </div>
-
-          <ul class="website-list" id="website-list">
-            <!-- Rendered dynamically -->
-          </ul>
-
-          <div class="options-box">
-            <h3>Matching &amp; Filtering Rules</h3>
+          <div class="section-label">Matching &amp; Extraction Rules</div>
+          <div class="inset-group">
             <div class="toggle-row">
               <div class="toggle-row-info">
-                <strong>Search next websites for missing Official / Unofficial pair</strong>
-                <span>When a device only has Official or only Unofficial on Website #1, check Website #2+ to fill the missing half.</span>
+                <strong>Fill missing Official / Unofficial pair</strong>
+                <span>Check lower-priority sites if only one half is found.</span>
               </div>
               <label class="switch">
                 <input type="checkbox" id="chk-missing-official-pair" checked>
@@ -357,8 +365,8 @@
             </div>
             <div class="toggle-row">
               <div class="toggle-row-info">
-                <strong>Skip Pre-Owned, Used &amp; Refurbished listings</strong>
-                <span>Automatically ignores used, open-box, and refurbished results unless explicitly written in your product name.</span>
+                <strong>Skip Pre-Owned &amp; Refurbished</strong>
+                <span>Ignore used or open-box results unless in your query.</span>
               </div>
               <label class="switch">
                 <input type="checkbox" id="chk-skip-preowned" checked>
@@ -367,8 +375,8 @@
             </div>
             <div class="toggle-row">
               <div class="toggle-row-info">
-                <strong>Filter out unrelated accessories for main devices</strong>
-                <span>Ignores cases, covers, protectors, and cables when searching phones, earbuds, watches, or laptops (still allows direct accessory searches like Baseus cables).</span>
+                <strong>Filter unrelated accessories</strong>
+                <span>Skip cases and cables when searching for main devices.</span>
               </div>
               <label class="switch">
                 <input type="checkbox" id="chk-skip-accessories" checked>
@@ -378,7 +386,7 @@
             <div class="toggle-row">
               <div class="toggle-row-info">
                 <strong>Strict model &amp; generation matching</strong>
-                <span>Prevents wrong generation matches (e.g. AirPods Pro 2 vs 3, iPhone 16 vs 16 Pro Max). Turn off for looser matching on stores with unusual titles.</span>
+                <span>Prevents version mismatches (e.g. AirPods Pro 2 vs 3).</span>
               </div>
               <label class="switch">
                 <input type="checkbox" id="chk-strict-model" checked>
@@ -387,8 +395,8 @@
             </div>
             <div class="toggle-row">
               <div class="toggle-row-info">
-                <strong>Retry search with simplified SKU / model code</strong>
-                <span>If a full query like &ldquo;Joyroom JR-OE2S&rdquo; returns no matches, automatically retries with &ldquo;JR-OE2S&rdquo; or &ldquo;Joyroom OE2S&rdquo;.</span>
+                <strong>Simplified SKU fallback search</strong>
+                <span>Retries with model code or shorter query on zero hits.</span>
               </div>
               <label class="switch">
                 <input type="checkbox" id="chk-fallback-sku" checked>
@@ -397,8 +405,8 @@
             </div>
             <div class="toggle-row">
               <div class="toggle-row-info">
-                <strong>Click through &amp; capture all product variants</strong>
-                <span>Clicks Size, Colour, Storage, Region, and Official/Unofficial options (including out-of-stock). Turn off for faster default-price-only runs.</span>
+                <strong>Capture product variants</strong>
+                <span>Extracts Size, Colour, Storage, and Region pricing.</span>
               </div>
               <label class="switch">
                 <input type="checkbox" id="chk-scrape-variants" checked>
@@ -407,258 +415,325 @@
             </div>
             <div class="toggle-row">
               <div class="toggle-row-info">
-                <strong>Download Hero Product Gallery images</strong>
-                <span>Downloads deduplicated max-quality .jpg photos strictly from the product gallery. Turn off for lightning-fast price &amp; specs-only runs.</span>
+                <strong>Download gallery images</strong>
+                <span>Saves deduplicated max-quality .jpg product photos.</span>
               </div>
               <label class="switch">
                 <input type="checkbox" id="chk-download-images" checked>
                 <span class="slider round"></span>
               </label>
             </div>
-            <div class="form-group" style="margin-top: 6px; margin-bottom: 0;">
-              <label for="txt-custom-excludes">Custom Exclude Keywords <small>(Comma-separated — listings containing any of these words are skipped)</small></label>
-              <input type="text" id="txt-custom-excludes" placeholder="e.g. replica, master copy, box only, dummy">
+            <div class="inset-slider-row">
+              <div class="toggle-row-info">
+                <strong>Max images per product</strong>
+                <span>Cap downloads per product (0 = unlimited).</span>
+              </div>
+              <div class="inline-slider-control">
+                <input type="range" id="range-max-images" min="0" max="20" value="0" step="1">
+                <span class="slider-val" id="val-max-images">Unlimited</span>
+              </div>
+            </div>
+            <div class="inset-field-row">
+              <div class="inset-field-label">
+                <label for="txt-custom-excludes">Exclude keywords</label>
+                <span>Comma-separated words to skip</span>
+              </div>
+              <div class="inset-field-control">
+                <input type="text" id="txt-custom-excludes" placeholder="replica, master copy, box only, dummy">
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- TAB 3: BROWSER & RESOURCE LIMITS -->
+      <!-- TAB 4: BROWSER & SPEED -->
       <section class="tab-panel" id="tab-resources">
-        <div class="card">
-          <div class="card-header">
-            <h2>Browser Engine (Always-Visible Incognito)</h2>
-            <p>Launches a clean, isolated visible Incognito browser window without touching personal bookmarks, tabs, or logins.</p>
-          </div>
-
-          <div class="browser-status-grid" id="browser-status-grid">
-            <div class="browser-pill-card">
-              <span class="browser-name">Google Chrome</span>
-              <span class="detect-badge checking" id="badge-chrome">Checking...</span>
-            </div>
-            <div class="browser-pill-card">
-              <span class="browser-name">Microsoft Edge</span>
-              <span class="detect-badge checking" id="badge-msedge">Checking...</span>
-            </div>
-            <div class="browser-pill-card">
-              <span class="browser-name">Brave Browser</span>
-              <span class="detect-badge checking" id="badge-brave">Checking...</span>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="sel-browser-mode">Active Browser Preference</label>
-            <select id="sel-browser-mode" class="form-select">
-              <option value="auto">Auto-Detect Installed (Chrome &rarr; Edge &rarr; Brave)</option>
-              <option value="chrome">Google Chrome</option>
-              <option value="msedge">Microsoft Edge</option>
-              <option value="brave">Brave Browser</option>
-              <option value="bundled">Playwright Built-in Chromium</option>
-              <option value="custom">Custom Browser Binary Path...</option>
-            </select>
-          </div>
-
-          <div class="form-group hidden" id="custom-browser-group">
-            <label for="custom-browser-path">Custom Browser Binary Path</label>
-            <input type="text" id="custom-browser-path" placeholder="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome">
-          </div>
-
-          <div class="action-card">
-            <div>
-              <strong>Built-in Chromium Fallback</strong>
-              <p>If Chrome, Edge, or Brave is not installed on this computer, download Playwright's built-in Chromium in one click.</p>
-            </div>
-            <button class="btn btn-secondary" id="btn-install-chromium" type="button">Install Built-in Browser</button>
-          </div>
-          <div class="install-progress-box hidden" id="install-progress-box">
-            <pre id="install-log"></pre>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h2>Interactive Resource Guardrails</h2>
-            <p>Live CPU and memory telemetry across Python and all spawned browser processes.</p>
-          </div>
-
-          <div class="live-gauges-grid">
-            <div class="gauge-card">
-              <div class="gauge-top">
-                <span class="gauge-title">Live CPU Usage</span>
-                <strong class="gauge-number" id="gauge-cpu-text">0%</strong>
+        <div class="panel-container">
+          <div class="section-label">Browser (Visible Incognito)</div>
+          <div class="inset-group">
+            <div class="browser-status-strip" id="browser-status-grid">
+              <div class="browser-status-item">
+                <span class="browser-name">Chrome</span>
+                <span class="detect-badge checking" id="badge-chrome">Checking…</span>
               </div>
-              <div class="progress-track">
-                <div class="progress-bar" id="gauge-cpu-bar" style="width: 0%"></div>
+              <div class="browser-status-item">
+                <span class="browser-name">Edge</span>
+                <span class="detect-badge checking" id="badge-msedge">Checking…</span>
+              </div>
+              <div class="browser-status-item">
+                <span class="browser-name">Brave</span>
+                <span class="detect-badge checking" id="badge-brave">Checking…</span>
               </div>
             </div>
-            <div class="gauge-card">
-              <div class="gauge-top">
-                <span class="gauge-title">Live Memory Usage</span>
-                <strong class="gauge-number" id="gauge-ram-text">0 MB / 2.0 GB</strong>
+
+            <div class="inset-field-row">
+              <div class="inset-field-label">
+                <label for="sel-browser-mode">Preferred browser</label>
+                <span>Always isolated from personal tabs</span>
               </div>
-              <div class="progress-track">
-                <div class="progress-bar" id="gauge-ram-bar" style="width: 0%"></div>
+              <div class="inset-field-control">
+                <select id="sel-browser-mode" class="form-select">
+                  <option value="auto">Auto-Detect (Chrome &rarr; Edge &rarr; Brave)</option>
+                  <option value="chrome">Google Chrome</option>
+                  <option value="msedge">Microsoft Edge</option>
+                  <option value="brave">Brave Browser</option>
+                  <option value="bundled">Playwright Built-in Chromium</option>
+                  <option value="custom">Custom Binary Path…</option>
+                </select>
               </div>
+            </div>
+
+            <div class="inset-field-row hidden" id="custom-browser-group">
+              <div class="inset-field-label">
+                <label for="custom-browser-path">Binary path</label>
+                <span>Executable location</span>
+              </div>
+              <div class="inset-field-control">
+                <input type="text" id="custom-browser-path" placeholder="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome">
+              </div>
+            </div>
+
+            <div class="toggle-row">
+              <div class="toggle-row-info">
+                <strong>Built-in Chromium fallback</strong>
+                <span>Install Playwright Chromium if no browser is present.</span>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="btn-install-chromium" type="button">Install…</button>
+            </div>
+            <div class="install-progress-box hidden" id="install-progress-box">
+              <pre id="install-log"></pre>
             </div>
           </div>
 
-          <div class="sliders-grid">
-            <div class="slider-control">
-              <div class="slider-header">
-                <label for="range-cpu-cores">Max CPU Cores</label>
+          <div class="section-label">Speed, Pacing &amp; Completion</div>
+          <div class="inset-group">
+            <div class="toggle-row">
+              <div class="toggle-row-info">
+                <strong>Block 3rd-party trackers &amp; ads</strong>
+                <span>Aborts analytics and chat widgets for faster page loads.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="chk-block-trackers" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
+            <div class="inset-slider-row">
+              <div class="toggle-row-info">
+                <strong>Politeness delay</strong>
+                <span>Pause between products to avoid rate-limits.</span>
+              </div>
+              <div class="inline-slider-control">
+                <input type="range" id="range-request-delay" min="0" max="5" value="0.5" step="0.5">
+                <span class="slider-val" id="val-request-delay">0.5s</span>
+              </div>
+            </div>
+            <div class="inset-slider-row">
+              <div class="toggle-row-info">
+                <strong>Page timeout</strong>
+                <span>Max wait for slow stores before skipping.</span>
+              </div>
+              <div class="inline-slider-control">
+                <input type="range" id="range-page-timeout" min="10" max="60" value="25" step="5">
+                <span class="slider-val" id="val-page-timeout">25s</span>
+              </div>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-row-info">
+                <strong>Play chime when finished</strong>
+                <span>Subtle notification sound on queue completion.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="chk-sound-complete" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-row-info">
+                <strong>Auto-open Excel when finished</strong>
+                <span>Opens the saved .xlsx workbook automatically.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="chk-auto-open-excel">
+                <span class="slider round"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="section-label">Resource Limits</div>
+          <div class="inset-group">
+            <div class="live-gauges-strip">
+              <div class="gauge-inline">
+                <div class="gauge-top">
+                  <span class="gauge-title">CPU</span>
+                  <strong class="gauge-number" id="gauge-cpu-text">0%</strong>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-bar" id="gauge-cpu-bar" style="width: 0%"></div>
+                </div>
+              </div>
+              <div class="gauge-inline">
+                <div class="gauge-top">
+                  <span class="gauge-title">Memory</span>
+                  <strong class="gauge-number" id="gauge-ram-text">0 MB / 2.0 GB</strong>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-bar" id="gauge-ram-bar" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="inset-slider-row">
+              <div class="toggle-row-info">
+                <strong>Max CPU cores</strong>
+                <span>Caps worker concurrency.</span>
+              </div>
+              <div class="inline-slider-control">
+                <input type="range" id="range-cpu-cores" min="1" max="8" value="2" step="1">
                 <span class="slider-val" id="val-cpu-cores">2 cores</span>
               </div>
-              <input type="range" id="range-cpu-cores" min="1" max="8" value="2" step="1">
-              <small>Caps worker concurrency and OS CPU affinity.</small>
             </div>
-
-            <div class="slider-control">
-              <div class="slider-header">
-                <label for="range-cpu-percent">Max CPU Usage %</label>
+            <div class="inset-slider-row">
+              <div class="toggle-row-info">
+                <strong>Max CPU usage</strong>
+                <span>Throttles with short pauses above cap.</span>
+              </div>
+              <div class="inline-slider-control">
+                <input type="range" id="range-cpu-percent" min="20" max="90" value="40" step="5">
                 <span class="slider-val" id="val-cpu-percent">40%</span>
               </div>
-              <input type="range" id="range-cpu-percent" min="20" max="90" value="40" step="5">
-              <small>Injects adaptive micro-pauses when CPU exceeds cap.</small>
             </div>
-
-            <div class="slider-control">
-              <div class="slider-header">
-                <label for="range-ram-gb">Max RAM Ceiling</label>
+            <div class="inset-slider-row">
+              <div class="toggle-row-info">
+                <strong>Max RAM ceiling</strong>
+                <span>Recycles browser context above 85%.</span>
+              </div>
+              <div class="inline-slider-control">
+                <input type="range" id="range-ram-gb" min="1.0" max="8.0" value="2.0" step="0.5">
                 <span class="slider-val" id="val-ram-gb">2.0 GB</span>
               </div>
-              <input type="range" id="range-ram-gb" min="1.0" max="8.0" value="2.0" step="0.5">
-              <small>Recycles browser context between products above 85%.</small>
             </div>
+          </div>
+
+          <div class="settings-reset-bar">
+            <button class="btn btn-ghost btn-sm btn-tint-danger" id="btn-reset-settings" type="button">Reset All Settings to Defaults…</button>
           </div>
         </div>
       </section>
 
-      <!-- TAB 4: BRAND & GEMINI AI -->
+      <!-- TAB 5: AI & BRAND -->
       <section class="tab-panel" id="tab-gemini">
-        <div class="card">
-          <div class="card-header">
-            <div class="toggle-header">
-              <div>
-                <h2>Google Gemini AI Content Engine</h2>
-                <p>Rewrites product descriptions into clean semantic HTML and generates missing specs. Skipped automatically for Not Found products.</p>
+        <div class="panel-container">
+          <div class="section-label">Gemini AI</div>
+          <div class="inset-group">
+            <div class="toggle-row">
+              <div class="toggle-row-info">
+                <strong>Enable Gemini formatting</strong>
+                <span>Rewrites descriptions into clean HTML and fills missing specs.</span>
               </div>
               <label class="switch">
                 <input type="checkbox" id="chk-enable-gemini" checked>
                 <span class="slider round"></span>
               </label>
             </div>
-          </div>
 
-          <div id="gemini-settings-container">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="gemini-api-key">
-                  Google Gemini API Key
-                  <button class="inline-link-btn" id="btn-open-aistudio" type="button">(Get Free Key &nearr;)</button>
-                </label>
-                <div class="input-with-button">
-                  <input type="password" id="gemini-api-key" placeholder="Paste Google AI Studio key (optional — works without AI too)...">
-                  <button class="btn btn-secondary" id="btn-toggle-key-visibility" type="button">Show</button>
+            <div id="gemini-settings-container">
+              <div class="inset-field-row">
+                <div class="inset-field-label">
+                  <label for="gemini-api-key">API key</label>
+                  <span><button class="inline-link-btn" id="btn-open-aistudio" type="button">Get key at AI Studio &nearr;</button></span>
+                </div>
+                <div class="inset-field-control">
+                  <input type="password" id="gemini-api-key" placeholder="Optional — works without AI">
+                  <button class="btn btn-secondary btn-sm" id="btn-toggle-key-visibility" type="button">Show</button>
                 </div>
               </div>
 
-              <div class="form-group">
-                <label for="sel-gemini-model">AI Model Tier</label>
-                <select id="sel-gemini-model" class="form-select">
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended — Free Tier Friendly)</option>
-                  <option value="gemini-2.5-pro">Gemini 2.5 Pro (Higher Reasoning — Stricter Free Limits)</option>
+              <div class="inset-field-row">
+                <div class="inset-field-label">
+                  <label for="sel-gemini-model">Model</label>
+                  <span>Flash is fastest and free-tier friendly</span>
+                </div>
+                <div class="inset-field-control">
+                  <select id="sel-gemini-model" class="form-select">
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</option>
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="inset-block-row">
+                <div class="inset-block-label">HTML description template</div>
+                <select id="sel-structure-preset" class="hidden" aria-hidden="true">
+                  <option value="standard">standard</option>
+                  <option value="short">short</option>
+                  <option value="detailed">detailed</option>
+                  <option value="custom">custom</option>
                 </select>
+                <div class="preset-cards-grid" id="preset-cards-grid">
+                  <button class="preset-card active" data-preset="standard" type="button">
+                    <strong>Standard</strong>
+                    <span>Intro + Key features + Store summary</span>
+                  </button>
+                  <button class="preset-card" data-preset="short" type="button">
+                    <strong>Short</strong>
+                    <span>2-sentence hook + 4 bullets</span>
+                  </button>
+                  <button class="preset-card" data-preset="detailed" type="button">
+                    <strong>Detailed</strong>
+                    <span>Design, specs highlights + warranty</span>
+                  </button>
+                  <button class="preset-card" data-preset="custom" type="button">
+                    <strong>Custom</strong>
+                    <span>Define your own outline</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="inset-block-row hidden" id="custom-structure-group">
+                <label class="inset-block-label" for="txt-custom-structure">Custom outline</label>
+                <textarea id="txt-custom-structure" rows="3" placeholder="1. Opening paragraph&#10;2. Key highlights&#10;3. Why buy from your store"></textarea>
               </div>
             </div>
+          </div>
 
-            <div class="form-group">
-              <label>Description HTML Structure Template</label>
-              <select id="sel-structure-preset" class="hidden" aria-hidden="true">
-                <option value="standard">standard</option>
-                <option value="short">short</option>
-                <option value="detailed">detailed</option>
-                <option value="custom">custom</option>
-              </select>
-              <div class="preset-cards-grid" id="preset-cards-grid">
-                <button class="preset-card active" data-preset="standard" type="button">
-                  <strong>Standard E-Commerce</strong>
-                  <span>Intro paragraph + Key Features bullets + Why Buy From Us</span>
-                </button>
-                <button class="preset-card" data-preset="short" type="button">
-                  <strong>Short &amp; Punchy</strong>
-                  <span>Concise 2-sentence hook + 4 crisp highlight bullets</span>
-                </button>
-                <button class="preset-card" data-preset="detailed" type="button">
-                  <strong>Detailed Guide</strong>
-                  <span>Design, Performance, Specs Highlights + Store Guarantee</span>
-                </button>
-                <button class="preset-card" data-preset="custom" type="button">
-                  <strong>Custom Structure</strong>
-                  <span>Write your own section-by-section outline below</span>
-                </button>
-              </div>
+          <div class="section-label">Store Profile (Replaces Competitor Info)</div>
+          <div class="inset-group">
+            <div class="inset-field-row">
+              <div class="inset-field-label"><label for="brand-name">Store name</label></div>
+              <div class="inset-field-control"><input type="text" id="brand-name" placeholder="e.g. Evolution Gadget"></div>
             </div>
-
-            <div class="form-group hidden" id="custom-structure-group">
-              <label for="txt-custom-structure">Custom HTML Structure Instructions for Gemini</label>
-              <textarea id="txt-custom-structure" rows="4" placeholder="1. Opening Hook Paragraph&#10;2. Key Highlights Bullet List&#10;3. Performance &amp; Battery Summary&#10;4. Why Buy From [Your Store]"></textarea>
+            <div class="inset-field-row">
+              <div class="inset-field-label"><label for="brand-url">Website</label></div>
+              <div class="inset-field-control"><input type="text" id="brand-url" placeholder="https://yourstore.com"></div>
             </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h2>Store Brand Profile</h2>
-            <p>All competitor store names, URLs, phones, and addresses are stripped automatically and replaced with your store details.</p>
-          </div>
-
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="brand-name">Store / Brand Name</label>
-              <input type="text" id="brand-name" placeholder="e.g. Evolution Gadget">
+            <div class="inset-field-row">
+              <div class="inset-field-label"><label for="store-address">Address</label></div>
+              <div class="inset-field-control"><input type="text" id="store-address" placeholder="Shop 42, Level 5, Dhaka"></div>
             </div>
-
-            <div class="form-group">
-              <label for="brand-url">Website URL</label>
-              <input type="text" id="brand-url" placeholder="https://evolutiongadget.tech">
+            <div class="inset-block-row">
+              <label class="inset-block-label" for="selling-points">Selling points</label>
+              <textarea id="selling-points" rows="2" placeholder="100% genuine products, official warranty, fast nationwide delivery"></textarea>
             </div>
-          </div>
-
-          <div class="form-group">
-            <label for="store-address">Store Address</label>
-            <input type="text" id="store-address" placeholder="e.g. Shop 42, Level 5, Bashundhara City, Dhaka">
-          </div>
-
-          <div class="form-group">
-            <label for="selling-points">Key Selling Points to Highlight</label>
-            <textarea id="selling-points" rows="2" placeholder="e.g. 100% Genuine Products, Official &amp; International Warranty, Fast Nationwide Delivery..."></textarea>
-          </div>
-
-          <div class="form-group">
-            <label for="custom-rules">Custom Rules / Prompt Tweaks</label>
-            <textarea id="custom-rules" rows="2" placeholder="e.g. Keep tone helpful and trustworthy. Always emphasize official warranty coverage..."></textarea>
+            <div class="inset-block-row">
+              <label class="inset-block-label" for="custom-rules">Custom prompt rules</label>
+              <textarea id="custom-rules" rows="2" placeholder="Keep tone helpful and concise. Highlight warranty coverage."></textarea>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- TAB 5: ACTIVITY LOG -->
+      <!-- TAB 6: LOGS -->
       <section class="tab-panel" id="tab-logs">
         <div class="card log-card">
           <div class="card-header log-header">
-            <h2>Execution &amp; Activity Log</h2>
+            <h2>Activity Log</h2>
             <div class="log-actions">
-              <button class="btn btn-secondary btn-sm" id="btn-copy-log" type="button">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span>Copy Log</span>
-              </button>
-              <button class="btn btn-secondary btn-sm" id="btn-clear-log" type="button">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-                <span>Clear</span>
-              </button>
+              <button class="btn btn-secondary btn-sm" id="btn-copy-log" type="button">Copy</button>
+              <button class="btn btn-secondary btn-sm" id="btn-clear-log" type="button">Clear</button>
             </div>
           </div>
           <div class="log-terminal" id="log-terminal">
-            <div class="log-entry info">[System] Scraper initialized and ready.</div>
+            <div class="log-entry info">[System] Ready.</div>
           </div>
         </div>
       </section>
@@ -667,17 +742,17 @@
 
   <!-- Slide-Over Product Inspector Drawer -->
   <div class="drawer-backdrop hidden" id="drawer-backdrop"></div>
-  <aside class="product-drawer hidden" id="product-drawer" aria-label="Product details inspector">
+  <aside class="product-drawer hidden" id="product-drawer" aria-label="Product inspector">
     <div class="drawer-header">
       <div class="drawer-title-block">
-        <h3 id="drawer-product-name">Product Details</h3>
+        <h3 id="drawer-product-name">Product</h3>
         <div class="drawer-meta" id="drawer-meta"></div>
       </div>
       <div class="drawer-header-controls">
-        <button class="btn btn-secondary btn-xs" id="btn-drawer-prev" type="button" title="Previous product">&larr; Prev</button>
-        <button class="btn btn-secondary btn-xs" id="btn-drawer-next" type="button" title="Next product">Next &rarr;</button>
-        <button class="btn btn-ghost btn-icon" id="btn-close-drawer" type="button" title="Close inspector (Esc)">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <button class="btn btn-secondary btn-xs" id="btn-drawer-prev" type="button" title="Previous product">&larr;</button>
+        <button class="btn btn-secondary btn-xs" id="btn-drawer-next" type="button" title="Next product">&rarr;</button>
+        <button class="btn btn-ghost btn-icon btn-xs" id="btn-close-drawer" type="button" title="Close (Esc)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
     </div>
@@ -686,17 +761,16 @@
 
     <div class="drawer-tabs" role="tablist">
       <button class="drawer-tab active" data-drawer-tab="desc" type="button">Description</button>
-      <button class="drawer-tab" data-drawer-tab="specs" type="button">Specifications</button>
+      <button class="drawer-tab" data-drawer-tab="specs" type="button">Specs</button>
       <button class="drawer-tab" data-drawer-tab="variants" type="button">Variants</button>
     </div>
 
     <div class="drawer-body">
-      <!-- Description Pane -->
       <div class="drawer-pane active" id="drawer-pane-desc">
         <div class="drawer-pane-toolbar">
           <div class="mini-seg">
-            <button class="mini-seg-btn active" id="btn-desc-rendered" type="button">Rendered Preview</button>
-            <button class="mini-seg-btn" id="btn-desc-raw" type="button">Raw HTML</button>
+            <button class="mini-seg-btn active" id="btn-desc-rendered" type="button">Preview</button>
+            <button class="mini-seg-btn" id="btn-desc-raw" type="button">HTML</button>
           </div>
           <button class="btn btn-secondary btn-xs" id="btn-copy-desc-html" type="button">Copy HTML</button>
         </div>
@@ -704,35 +778,45 @@
         <pre class="code-preview-box hidden" id="drawer-desc-raw"></pre>
       </div>
 
-      <!-- Specs Pane -->
       <div class="drawer-pane hidden" id="drawer-pane-specs">
         <div class="drawer-pane-toolbar">
-          <span class="drawer-pane-hint">Plain-text specifications</span>
-          <button class="btn btn-secondary btn-xs" id="btn-copy-specs" type="button">Copy Specs</button>
+          <span class="drawer-pane-hint">Plain text</span>
+          <button class="btn btn-secondary btn-xs" id="btn-copy-specs" type="button">Copy</button>
         </div>
         <pre class="specs-preview-box" id="drawer-specs-content"></pre>
       </div>
 
-      <!-- Variants Pane -->
       <div class="drawer-pane hidden" id="drawer-pane-variants">
         <div id="drawer-variants-list" class="drawer-variants-list"></div>
       </div>
     </div>
   </aside>
 
+  <!-- Quick Jump Command Palette (Cmd/Ctrl+K) -->
+  <dialog class="cmdk-dialog" id="cmdk-dialog">
+    <div class="cmdk-box">
+      <div class="cmdk-input-row">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="cmdk-input" placeholder="Jump to any tab, setting, or action…" autocomplete="off">
+        <kbd>Esc</kbd>
+      </div>
+      <ul class="cmdk-list" id="cmdk-list"></ul>
+    </div>
+  </dialog>
+
   <!-- Native Confirmation Dialog -->
   <dialog class="confirm-dialog" id="confirm-dialog">
     <div class="confirm-dialog-content">
-      <h3 id="confirm-dialog-title">Confirm Action</h3>
+      <h3 id="confirm-dialog-title">Confirm</h3>
       <p id="confirm-dialog-message">Are you sure?</p>
       <div class="confirm-dialog-actions">
-        <button class="btn btn-secondary" id="btn-confirm-cancel" type="button">Cancel</button>
-        <button class="btn btn-danger" id="btn-confirm-ok" type="button">Confirm</button>
+        <button class="btn btn-secondary btn-sm" id="btn-confirm-cancel" type="button">Cancel</button>
+        <button class="btn btn-danger btn-sm" id="btn-confirm-ok" type="button">Confirm</button>
       </div>
     </div>
   </dialog>
 
-  <!-- Toast Notification Container -->
+  <!-- Toast Notification Stack -->
   <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
   <script src="app.js"></script>

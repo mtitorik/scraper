@@ -41,12 +41,15 @@ class AppSettings:
     # Browser configuration
     browser_mode: str = "auto"  # "auto", "chrome", "msedge", "brave", "bundled", "custom"
     custom_browser_path: str = ""
-    
+    block_trackers: bool = True
+    request_delay_sec: float = 0.5
+    page_timeout_sec: int = 25
+
     # Resource limiting
     max_cpu_cores: int = 2
     max_cpu_percent: int = 40
     max_ram_gb: float = 2.0
-    
+
     # Scraping behavior (Matching & Filtering Rules)
     search_missing_official_unofficial_pair: bool = True  # Option C
     skip_preowned_devices: bool = True
@@ -55,11 +58,14 @@ class AppSettings:
     enable_fallback_sku_search: bool = True
     scrape_variants: bool = True
     download_images: bool = True
+    max_images_per_product: int = 0  # 0 = Unlimited
     custom_exclude_keywords: str = ""
 
-    # UI preferences
+    # UI & Workflow preferences
     theme: str = "dark"  # "dark" or "light"
     sidebar_collapsed: bool = False
+    sound_on_complete: bool = True
+    auto_open_excel: bool = False
     
     # Gemini AI configuration
     enable_gemini: bool = True

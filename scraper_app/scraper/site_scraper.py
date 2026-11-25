@@ -395,6 +395,7 @@ class SiteScraper:
         strict_model_matching: bool = True,
         enable_fallback_sku_search: bool = True,
         custom_excludes: Optional[List[str]] = None,
+        page_timeout_ms: int = 25000,
     ) -> List[Dict[str, str]]:
         """Navigates to site_url, performs search (with optional smart SKU fallback),
         and returns top-ranked candidate link(s) matching product_name.
@@ -410,7 +411,7 @@ class SiteScraper:
                 if existing_input is not None:
                     need_home = False
             if need_home:
-                await page.goto(site_url, wait_until="domcontentloaded", timeout=25000)
+                await page.goto(site_url, wait_until="domcontentloaded", timeout=page_timeout_ms)
                 await asyncio.sleep(0.25)
             await PopupGuard.dismiss_promotional_popups(page)
 
@@ -426,7 +427,7 @@ class SiteScraper:
 
             # Safety fallback: if same-origin subpage search returned nothing, reload homepage once and retry
             if not candidates and not need_home:
-                await page.goto(site_url, wait_until="domcontentloaded", timeout=25000)
+                await page.goto(site_url, wait_until="domcontentloaded", timeout=page_timeout_ms)
                 await asyncio.sleep(0.25)
                 await PopupGuard.dismiss_promotional_popups(page)
                 candidates = await cls._run_search_query(
@@ -483,6 +484,7 @@ class SiteScraper:
         stop_event: Optional[asyncio.Event] = None,
         throttle_callback: Optional[Any] = None,
         scrape_variants: bool = True,
+        page_timeout_ms: int = 25000,
     ) -> Dict[str, Any]:
         """Scrapes full specifications, raw description, warranty, images,
         and variant clicks from a single product page using a 3-layer universal extractor.
@@ -504,7 +506,7 @@ class SiteScraper:
             cur_norm = (page.url or "").split("#")[0].rstrip("/")
             target_norm = (page_url or "").split("#")[0].rstrip("/")
             if cur_norm != target_norm:
-                await page.goto(page_url, wait_until="domcontentloaded", timeout=25000)
+                await page.goto(page_url, wait_until="domcontentloaded", timeout=page_timeout_ms)
                 try:
                     await page.wait_for_load_state("networkidle", timeout=1800)
                 except Exception:
