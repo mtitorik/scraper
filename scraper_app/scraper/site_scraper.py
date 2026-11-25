@@ -411,7 +411,25 @@ class SiteScraper:
             # 1. Product title (4-step fallback: h1 -> product-title/schema -> og:title -> document.title)
             result["raw_title"] = await cls._extract_page_title(page)
 
-            # 2. Click Specification tab if interactive
+            # 2. Run Variant Click-Loop FIRST while page is at top (zero sticky-header interference!)
+            await PopupGuard.dismiss_promotional_popups(page)
+            await page.evaluate("window.scrollTo(0, 0)")
+            await asyncio.sleep(0.2)
+
+            def_price, attr_options, combos, extra_imgs = await VariantExtractor.extract_all_variants_and_combos(
+                page=page,
+                product_name=target_product_name,
+                source_website=source_website,
+                page_link=page_url,
+                pause_event=pause_event,
+                stop_event=stop_event,
+                throttle_callback=throttle_callback,
+            )
+            result["default_price"] = def_price
+            result["attribute_options"] = attr_options
+            result["variant_combinations"] = combos
+
+            # 3. Click Specification tab if interactive
             for tab_sel in [
                 "button:has-text('Specification')",
                 "a:has-text('Specification')",
@@ -787,25 +805,6 @@ class SiteScraper:
 
                 return Array.from(byKey.values()).map(v => v.src);
             }""")
-
-            # 6. Dismiss any delayed promo popup & scroll cleanly to top before clicking variant buttons
-            await PopupGuard.dismiss_promotional_popups(page)
-            await page.evaluate("window.scrollTo(0, 0)")
-            await asyncio.sleep(0.25)
-
-            def_price, attr_options, combos, extra_imgs = await VariantExtractor.extract_all_variants_and_combos(
-                page=page,
-                product_name=target_product_name,
-                source_website=source_website,
-                page_link=page_url,
-                pause_event=pause_event,
-                stop_event=stop_event,
-                throttle_callback=throttle_callback,
-            )
-
-            result["default_price"] = def_price
-            result["attribute_options"] = attr_options
-            result["variant_combinations"] = combos
 
             all_imgs = list(gallery_images)
             for ex in extra_imgs:

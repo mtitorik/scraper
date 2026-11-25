@@ -92,9 +92,19 @@ def parse_price(text: Optional[str]) -> Optional[int]:
     return None
 
 
+MAIN_DEVICE_KEYWORDS = [
+    "iphone", "samsung", "galaxy", "pixel", "xiaomi", "redmi", "poco", "oneplus",
+    "realme", "oppo", "vivo", "motorola", "nokia", "honor", "huawei", "tecno", "infinix",
+    "ipad", "macbook", "imac", "mac mini", "watch", "airpods", "buds", "earbuds",
+    "earphone", "headphone", "tws", "laptop", "tablet", "tab", "speaker", "camera",
+    "gopro", "drone", "monitor", "playstation", "ps5", "xbox", "nintendo", "switch",
+]
+
+
 def is_accessory(candidate_title: str, query: str) -> bool:
-    """Returns True if candidate appears to be a standalone accessory while the query is not.
-    Ignores benign phrases like 'with MagSafe Charging Case' or 'with Sport Band'.
+    """Returns True if candidate appears to be a standalone accessory while the query is a main device.
+    Allows searching accessory brands/models directly (e.g. 'Baseus Dura Series PD' -> '...Fast Charging Cable'),
+    and ignores benign phrases like 'with MagSafe Charging Case' or 'with Sport Band'.
     """
     q_lower = query.lower()
     c_lower = candidate_title.lower()
@@ -109,7 +119,15 @@ def is_accessory(candidate_title: str, query: str) -> bool:
     for phrase_pat in INCLUDED_ACCESSORY_PHRASES:
         stripped_title = re.sub(phrase_pat, " ", stripped_title)
 
-    # Check if remaining candidate title has an accessory keyword
+    # Check if the query is for a main device (phone, earbuds, watch, tablet, laptop, etc.)
+    query_is_main_device = any(re.search(r"\b" + re.escape(dev) + r"\b", q_lower) for dev in MAIN_DEVICE_KEYWORDS)
+
+    # If query is NOT a main device (e.g. "Baseus Dura Series PD", "Anker 65W", "Ugreen Nexode"),
+    # only reject explicit protective covers/cases meant FOR another device
+    if not query_is_main_device:
+        return bool(re.search(r"\b(case|cover|protector|glass|pouch|sleeve)\s+for\b", stripped_title))
+
+    # For main devices, reject standalone accessories
     for acc in ACCESSORY_KEYWORDS:
         if re.search(r"\b" + re.escape(acc) + r"\b", stripped_title):
             return True

@@ -128,6 +128,11 @@ def test_joyroom_jr_oe2s_and_anker_r60i_nc_matching():
     assert is_accessory("CMF Buds Pro 2 Case Protector", q_cmf) is True
     assert matches_model_name("CMF by Nothing Buds 2 Plus ANC TWS Earbuds", q_cmf) is False
 
+    # Baseus Dura Series PD (cable/charger brand without 'Cable' in query must NOT be rejected!)
+    q_baseus = "Baseus Dura Series PD"
+    assert is_accessory("Baseus Dura Series PD 100W Fast Charging Cable", q_baseus) is False
+    assert matches_model_name("Baseus Dura Series PD 100W Fast Charging Cable", q_baseus) is True
+
 
 def test_candidate_scoring_ranks_exact_match_first():
     query = "Apple AirPods Pro 2"
