@@ -38,7 +38,13 @@ class VariantExtractor:
                 let disc = null;
 
                 const isExcludedAncestor = (el) => {
-                    return !el || Boolean(el.closest("header, footer, nav, .related, .upsells, [class*='related' i], #tabDescription, #tabWarranty, table"));
+                    if (!el) return true;
+                    if (el.closest("header, footer, nav, [role='dialog'], .related, .upsells, [class*='related' i], #tabDescription, #tabWarranty, table")) return true;
+                    // Only consider hero prices near the top of the product page (never Related Products below!)
+                    const rect = el.getBoundingClientRect();
+                    if (rect.width === 0 && rect.height === 0) return true;
+                    if (rect.top < 0 || rect.top > 780) return true;
+                    return false;
                 };
 
                 const isNoiseText = (txt) => {
