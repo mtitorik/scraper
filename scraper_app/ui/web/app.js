@@ -2,6 +2,8 @@
 let appSettings = {};
 let activeSheet = "sheet1";
 let inputMode = "file";
+let statusFilter = "all";
+let lastUpdatedProductName = null;
 let productsMap = new Map(); // product_name -> summary dict
 let variantsList = [];
 let isScrapingRunning = false;
@@ -31,13 +33,27 @@ const playAlertChime = () => {
 // DOM Elements
 const elements = {
   sidebarBrandSubtitle: document.getElementById("sidebar-brand-subtitle"),
+  navResultsCount: document.getElementById("nav-results-count"),
   navWebsitesCount: document.getElementById("nav-websites-count"),
   statusBadge: document.getElementById("status-badge"),
   statusBadgeText: document.getElementById("status-badge-text"),
   statusDescription: document.getElementById("status-description"),
+  headerLiveControls: document.getElementById("header-live-controls"),
+  headerMiniProgress: document.getElementById("header-mini-progress"),
+  btnHeaderPause: document.getElementById("btn-header-pause"),
+  btnHeaderStop: document.getElementById("btn-header-stop"),
   captchaBanner: document.getElementById("captcha-banner"),
   captchaSiteText: document.getElementById("captcha-site-text"),
   btnCaptchaDone: document.getElementById("btn-captcha-done"),
+
+  // Readiness pills
+  pillReadyProducts: document.getElementById("pill-ready-products"),
+  pillReadyProductsText: document.getElementById("pill-ready-products-text"),
+  pillReadyWebsites: document.getElementById("pill-ready-websites"),
+  pillReadyWebsitesText: document.getElementById("pill-ready-websites-text"),
+  pillReadyFolder: document.getElementById("pill-ready-folder"),
+  pillReadyFolderText: document.getElementById("pill-ready-folder-text"),
+  btnJumpResults: document.getElementById("btn-jump-results"),
 
   // Input mode & manual entry
   btnModeFile: document.getElementById("btn-mode-file"),
@@ -146,6 +162,8 @@ const elements = {
   // Product Inspector Drawer
   drawerBackdrop: document.getElementById("drawer-backdrop"),
   productDrawer: document.getElementById("product-drawer"),
+  btnDrawerPrev: document.getElementById("btn-drawer-prev"),
+  btnDrawerNext: document.getElementById("btn-drawer-next"),
   btnCloseDrawer: document.getElementById("btn-close-drawer"),
   drawerProductName: document.getElementById("drawer-product-name"),
   drawerMeta: document.getElementById("drawer-meta"),
@@ -317,15 +335,87 @@ window.onBackendEvent = (event) => {
   }
 };
 
-// Navigation Tab Switching
-document.querySelectorAll(".nav-item").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".nav-item").forEach((b) => b.classList.remove("active"));
-    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
-    btn.classList.add("active");
-    const targetId = btn.getAttribute("data-tab");
-    document.getElementById(targetId).classList.add("active");
+// Programmatic Tab Switching
+const switchTab = (tabId) => {
+  document.querySelectorAll(".nav-item").forEach((b) => {
+    b.classList.toggle("active", b.getAttribute("data-tab") === tabId);
   });
+  document.querySelectorAll(".tab-panel").forEach((p) => {
+    p.classList.toggle("active", p.id === tabId);
+  });
+  if (tabId === "tab-results") {
+    if (activeSheet === "sheet1") renderSheet1();
+    else renderSheet2();
+  }
+};
+
+document.querySelectorAll(".nav-item").forEach((btn) => {
+  btn.addEventListener("click", () => switchTab(btn.getAttribute("data-tab")));
+});
+
+// Pre-Flight Readiness Pills
+const updateReadinessPills = () => {
+  const hasProducts = inputMode === "manual"
+    ? parseManualProducts().length > 0
+    : Boolean(elements.inputXlsxPath.value || elements.resumeXlsxPath.value);
+  const websiteCount = (appSettings.websites || []).length;
+  const hasFolder = Boolean(elements.rootFolderPath.value);
+
+  elements.pillReadyProducts.classList.toggle("ready", hasProducts);
+  elements.pillReadyProductsText.textContent = hasProducts
+    ? (inputMode === "manual" ? `${parseManualProducts().length} products ready` : "Input .xlsx ready")
+    : "Add products";
+
+  elements.pillReadyWebsites.classList.toggle("ready", websiteCount > 0);
+  elements.pillReadyWebsitesText.textContent = websiteCount > 0
+    ? `${websiteCount} website${websiteCount === 1 ? "" : "s"}`
+    : "Add websites";
+
+  elements.pillReadyFolder.classList.toggle("ready", hasFolder);
+  elements.pillReadyFolderText.textContent = hasFolder ? "Image folder ready" : "Select image folder";
+};
+
+elements.pillReadyProducts.addEventListener("click", () => {
+  if (inputMode === "manual") elements.manualQuickInput.focus();
+  else elements.btnBrowseInput.click();
+});
+elements.pillReadyWebsites.addEventListener("click", () => switchTab("tab-websites"));
+elements.pillReadyFolder.addEventListener("click", () => elements.btnBrowseFolder.click());
+elements.btnJumpResults.addEventListener("click", () => switchTab("tab-results"));
+
+// Clickable KPI Status Filter Cards
+document.querySelectorAll(".kpi-card.clickable").forEach((card) => {
+  card.addEventListener("click", () => {
+    statusFilter = card.getAttribute("data-status-filter") || "all";
+    document.querySelectorAll(".kpi-card.clickable").forEach((c) => {
+      c.classList.toggle("active-filter", c === card);
+    });
+    if (activeSheet !== "sheet1") {
+      elements.tabSheet1.click();
+    } else {
+      renderSheet1();
+    }
+  });
+});
+
+// Keyboard Shortcuts (Esc, Cmd/Ctrl+1..6, Cmd/Ctrl+K)
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !elements.productDrawer.classList.contains("hidden")) {
+    closeProductDrawer();
+    return;
+  }
+  if (e.metaKey || e.ctrlKey) {
+    const tabOrder = ["tab-run", "tab-results", "tab-websites", "tab-resources", "tab-gemini", "tab-logs"];
+    const num = parseInt(e.key, 10);
+    if (num >= 1 && num <= 6) {
+      e.preventDefault();
+      switchTab(tabOrder[num - 1]);
+    } else if (e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      switchTab("tab-results");
+      elements.tableSearch.focus();
+    }
+  }
 });
 
 // Sheet Tab Switching
@@ -430,6 +520,7 @@ const updateProgressUI = ({ current, total, product_name, stage }) => {
   elements.progressStatusLabel.textContent = `${current} / ${total} Products (${pct}%)`;
   elements.progressSiteLabel.textContent = product_name ? `${product_name} • ${stage}` : "Idle";
   elements.mainProgressBar.style.width = `${pct}%`;
+  elements.headerMiniProgress.textContent = `${current} / ${total}`;
 };
 
 const updateKpiStrip = () => {
@@ -448,11 +539,13 @@ const updateKpiStrip = () => {
   elements.kpiDone.textContent = String(done);
   elements.kpiNotFound.textContent = String(notFound);
   elements.kpiVariants.textContent = String(totalVariants);
+  elements.navResultsCount.textContent = String(all.length);
 };
 
 // Update Row in Table
 const updateRowInTable = (record) => {
   productsMap.set(record.product_name, record);
+  lastUpdatedProductName = record.product_name;
   updateKpiStrip();
   if (activeSheet === "sheet1") {
     renderSheet1();
@@ -462,9 +555,11 @@ const updateRowInTable = (record) => {
 // Render Sheet 1 (Products)
 const renderSheet1 = () => {
   const filter = (elements.tableSearch.value || "").toLowerCase();
-  const records = Array.from(productsMap.values()).filter((r) =>
-    r.product_name.toLowerCase().includes(filter)
-  );
+  const records = Array.from(productsMap.values()).filter((r) => {
+    const matchesSearch = r.product_name.toLowerCase().includes(filter);
+    const matchesStatus = statusFilter === "all" || r.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   elements.tableRowCount.textContent = `${records.length} product${records.length === 1 ? "" : "s"}`;
 
@@ -521,7 +616,8 @@ const renderSheet1 = () => {
          </div>`
       : `<span class="desc-snippet">${escapeHtml(descPreview)}</span>`;
 
-    html += `<tr class="clickable-row" onclick="openProductDrawer(${safeNameArg})">
+    const flashCls = r.product_name === lastUpdatedProductName ? " row-flash" : "";
+    html += `<tr class="clickable-row${flashCls}" onclick="openProductDrawer(${safeNameArg})">
       <td><strong>${escapeHtml(r.product_name)}</strong></td>
       <td><span class="status-cell ${statusCls}">${escapeHtml(r.status || "Pending")}</span></td>
       <td><span class="price-val">${escapeHtml(regPrice)}</span></td>
@@ -650,9 +746,27 @@ window.openProductDrawer = async (productName, evt) => {
     }).join("");
   }
 
+  const names = Array.from(productsMap.keys());
+  const curIdx = names.indexOf(activeDrawerDetail.product_name || productName);
+  elements.btnDrawerPrev.disabled = curIdx <= 0;
+  elements.btnDrawerNext.disabled = curIdx === -1 || curIdx >= names.length - 1;
+
   elements.drawerBackdrop.classList.remove("hidden");
   elements.productDrawer.classList.remove("hidden");
 };
+
+const stepDrawerProduct = (delta) => {
+  if (!activeDrawerDetail) return;
+  const names = Array.from(productsMap.keys());
+  const curIdx = names.indexOf(activeDrawerDetail.product_name);
+  const nextIdx = curIdx + delta;
+  if (nextIdx >= 0 && nextIdx < names.length) {
+    openProductDrawer(names[nextIdx]);
+  }
+};
+
+elements.btnDrawerPrev.addEventListener("click", () => stepDrawerProduct(-1));
+elements.btnDrawerNext.addEventListener("click", () => stepDrawerProduct(1));
 
 const closeProductDrawer = () => {
   elements.drawerBackdrop.classList.add("hidden");
@@ -710,10 +824,16 @@ const updateAppStatus = (status) => {
     elements.btnPause.disabled = false;
     elements.btnPause.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>Pause</span>`;
     elements.btnStop.disabled = false;
+    elements.headerLiveControls.classList.remove("hidden");
+    elements.btnHeaderPause.textContent = "Pause";
+    elements.mainProgressBar.classList.add("active-shimmer");
     elements.statusDescription.textContent = "Scraping active in visible Incognito browser...";
   } else if (status === "Paused") {
     isScrapingPaused = true;
     elements.btnPause.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>Resume</span>`;
+    elements.headerLiveControls.classList.remove("hidden");
+    elements.btnHeaderPause.textContent = "Resume";
+    elements.mainProgressBar.classList.remove("active-shimmer");
     elements.statusDescription.textContent = "Paused cleanly at checkpoint.";
   } else {
     isScrapingRunning = false;
@@ -721,6 +841,8 @@ const updateAppStatus = (status) => {
     elements.btnStart.disabled = false;
     elements.btnPause.disabled = true;
     elements.btnStop.disabled = true;
+    elements.headerLiveControls.classList.add("hidden");
+    elements.mainProgressBar.classList.remove("active-shimmer");
     elements.captchaBanner.classList.add("hidden");
     elements.statusDescription.textContent = status === "Finished" ? "Scraping complete — all rows saved." : "Ready to scrape";
     if (status === "Finished") {
@@ -729,6 +851,9 @@ const updateAppStatus = (status) => {
     }
   }
 };
+
+elements.btnHeaderPause.addEventListener("click", () => elements.btnPause.click());
+elements.btnHeaderStop.addEventListener("click", () => elements.btnStop.click());
 
 // Website List Rendering
 const renderWebsites = () => {
@@ -889,8 +1014,13 @@ elements.btnStart.addEventListener("click", async () => {
 
   saveCurrentSettings();
   productsMap.clear();
+  statusFilter = "all";
+  document.querySelectorAll(".kpi-card.clickable").forEach((c) => {
+    c.classList.toggle("active-filter", c.getAttribute("data-status-filter") === "all");
+  });
   updateKpiStrip();
   renderSheet1();
+  switchTab("tab-results");
   addLogEntry(
     `Starting scraper queue (${inputMode === "manual" ? `${manualProducts.length} manual products` : "file mode"})...`,
     "info"
@@ -1030,6 +1160,7 @@ const saveCurrentSettings = () => {
   appSettings.custom_rules = elements.customRules.value;
 
   callApi("save_settings", appSettings);
+  updateReadinessPills();
 };
 
 [
@@ -1090,6 +1221,7 @@ const loadSettingsIntoUI = (s) => {
 
   applyTheme(s.theme || "dark", false);
   renderWebsites();
+  updateReadinessPills();
 };
 
 // Browser Auto-Detection Badges

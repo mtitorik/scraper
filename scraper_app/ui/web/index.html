@@ -25,24 +25,29 @@
       </div>
 
       <nav class="nav-menu" aria-label="Main navigation">
-        <button class="nav-item active" data-tab="tab-run" type="button">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-          <span>Run &amp; Live Table</span>
+        <button class="nav-item active" data-tab="tab-run" type="button" title="Launchpad (Cmd/Ctrl+1)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span>Launchpad</span>
         </button>
-        <button class="nav-item" data-tab="tab-websites" type="button">
+        <button class="nav-item" data-tab="tab-results" type="button" title="Live Results Table (Cmd/Ctrl+2)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+          <span>Live Results</span>
+          <span class="nav-badge" id="nav-results-count">0</span>
+        </button>
+        <button class="nav-item" data-tab="tab-websites" type="button" title="Websites Waterfall (Cmd/Ctrl+3)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           <span>Websites Waterfall</span>
           <span class="nav-badge" id="nav-websites-count">0</span>
         </button>
-        <button class="nav-item" data-tab="tab-resources" type="button">
+        <button class="nav-item" data-tab="tab-resources" type="button" title="Browser &amp; Limits (Cmd/Ctrl+4)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
           <span>Browser &amp; Limits</span>
         </button>
-        <button class="nav-item" data-tab="tab-gemini" type="button">
+        <button class="nav-item" data-tab="tab-gemini" type="button" title="Brand &amp; Gemini AI (Cmd/Ctrl+5)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3z"/></svg>
           <span>Brand &amp; Gemini AI</span>
         </button>
-        <button class="nav-item" data-tab="tab-logs" type="button">
+        <button class="nav-item" data-tab="tab-logs" type="button" title="Activity Log (Cmd/Ctrl+6)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
           <span>Activity Log</span>
         </button>
@@ -82,6 +87,11 @@
           <span class="status-text" id="status-description">Ready to scrape</span>
         </div>
         <div class="header-actions">
+          <div class="header-live-controls hidden" id="header-live-controls">
+            <span class="header-mini-progress" id="header-mini-progress">0 / 0</span>
+            <button class="btn btn-warning btn-xs" id="btn-header-pause" type="button">Pause</button>
+            <button class="btn btn-danger btn-xs" id="btn-header-stop" type="button">Stop</button>
+          </div>
           <button class="btn btn-secondary btn-sm" id="btn-open-excel-top" type="button" title="Open current Excel workbook">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
             <span>Open .xlsx</span>
@@ -184,6 +194,25 @@
             </div>
           </div>
 
+          <!-- Pre-Flight Readiness Pills -->
+          <div class="readiness-strip" id="readiness-strip">
+            <button class="readiness-pill missing" id="pill-ready-products" type="button">
+              <span class="readiness-dot"></span>
+              <span id="pill-ready-products-text">Add products</span>
+            </button>
+            <button class="readiness-pill missing" id="pill-ready-websites" type="button">
+              <span class="readiness-dot"></span>
+              <span id="pill-ready-websites-text">Add websites</span>
+            </button>
+            <button class="readiness-pill missing" id="pill-ready-folder" type="button">
+              <span class="readiness-dot"></span>
+              <span id="pill-ready-folder-text">Select image folder</span>
+            </button>
+            <button class="btn btn-ghost btn-xs" id="btn-jump-results" type="button" style="margin-left: auto;">
+              <span>View Live Results &rarr;</span>
+            </button>
+          </div>
+
           <!-- Controls Toolbar -->
           <div class="controls-toolbar">
             <div class="playback-buttons">
@@ -212,28 +241,31 @@
             </div>
           </div>
         </div>
+      </section>
 
-        <!-- Live KPI Summary Strip -->
+      <!-- TAB 2: DEDICATED FULL-HEIGHT LIVE RESULTS -->
+      <section class="tab-panel" id="tab-results">
+        <!-- Clickable KPI Filter Strip -->
         <div class="kpi-strip">
-          <div class="kpi-card">
+          <button class="kpi-card clickable active-filter" id="kpi-filter-all" data-status-filter="all" type="button">
             <span class="kpi-label">Total Products</span>
             <strong class="kpi-value" id="kpi-total">0</strong>
-          </div>
-          <div class="kpi-card">
+          </button>
+          <button class="kpi-card clickable" id="kpi-filter-done" data-status-filter="Done" type="button">
             <span class="kpi-label"><span class="kpi-dot success"></span>Completed</span>
             <strong class="kpi-value" id="kpi-done">0</strong>
-          </div>
-          <div class="kpi-card">
+          </button>
+          <button class="kpi-card clickable" id="kpi-filter-not-found" data-status-filter="Not Found" type="button">
             <span class="kpi-label"><span class="kpi-dot danger"></span>Not Found</span>
             <strong class="kpi-value" id="kpi-not-found">0</strong>
-          </div>
+          </button>
           <div class="kpi-card">
             <span class="kpi-label"><span class="kpi-dot accent"></span>Variants Captured</span>
             <strong class="kpi-value" id="kpi-variants">0</strong>
           </div>
         </div>
 
-        <!-- Live Spreadsheet Card -->
+        <!-- Full-Height Live Spreadsheet Card -->
         <div class="card table-card">
           <div class="table-card-header">
             <div class="sheet-tabs" role="tablist">
@@ -612,9 +644,13 @@
         <h3 id="drawer-product-name">Product Details</h3>
         <div class="drawer-meta" id="drawer-meta"></div>
       </div>
-      <button class="btn btn-ghost btn-icon" id="btn-close-drawer" type="button" title="Close inspector">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <div class="drawer-header-controls">
+        <button class="btn btn-secondary btn-xs" id="btn-drawer-prev" type="button" title="Previous product">&larr; Prev</button>
+        <button class="btn btn-secondary btn-xs" id="btn-drawer-next" type="button" title="Next product">Next &rarr;</button>
+        <button class="btn btn-ghost btn-icon" id="btn-close-drawer" type="button" title="Close inspector (Esc)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
     </div>
 
     <div class="drawer-quick-actions" id="drawer-quick-actions"></div>
