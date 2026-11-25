@@ -189,59 +189,51 @@ class ScraperOrchestrator:
             self.on_log(f"Launching visible Incognito browser ({self.settings.browser_mode})...")
             page = await self.browser_manager.start()
 
-            # Step 3: Iterate through products
-            completed_count = total_count - len(records_to_process)
-
-            for prod_idx, record in enumerate(records_to_process, start=1):
+            # Step 3: Website-First Waterfall Loop
+            # Pass 1: Search Website 1 for ALL pending/incomplete products
+            # Pass 2: Search Website 2 ONLY for products still missing or incomplete
+            # Pass N: Repeat sequentially; stop early as soon as all products are complete!
+            for site_idx, site_url in enumerate(websites, start=1):
                 if self.stop_event.is_set():
                     self.on_log("Stop requested. Exiting queue...")
                     break
 
-                # Handle pause
-                if not self.pause_event.is_set():
-                    self.on_log(f"Paused before processing '{record.product_name}'...")
-                    await self.pause_event.wait()
+                pending_for_pass = [
+                    rec for rec in self.workbook_manager.get_all_records()
+                    if rec.status in ("Pending", "In Progress", "Partial")
+                ]
 
-                # Handle resource throttling
-                await self.resource_guard.throttle_if_needed()
+                if not pending_for_pass:
+                    self.on_log("All products are complete! Stopping waterfall early.")
+                    break
 
-                record.status = "In Progress"
-                self.workbook_manager.update_record(record)
-                self.on_row_updated(record.to_summary_dict())
+                self.on_log(f"--- Pass {site_idx}/{len(websites)}: Searching {site_url} for {len(pending_for_pass)} pending product(s) ---")
 
-                self.on_progress({
-                    "current": prod_idx + completed_count,
-                    "total": total_count,
-                    "product_name": record.product_name,
-                    "site": websites[0] if websites else "",
-                    "stage": "Searching websites",
-                })
-                self.on_log(f"[{prod_idx + completed_count}/{total_count}] Processing '{record.product_name}'...")
-
-                product_found_anywhere = False
-
-                # Waterfall website search loop
-                for site_idx, site_url in enumerate(websites, start=1):
+                for pass_idx, record in enumerate(pending_for_pass, start=1):
                     if self.stop_event.is_set():
+                        self.on_log("Stop requested. Exiting queue...")
                         break
+
                     if not self.pause_event.is_set():
+                        self.on_log(f"Paused before processing '{record.product_name}'...")
                         await self.pause_event.wait()
+
                     await self.resource_guard.throttle_if_needed()
 
-                    # Check if row is already complete
-                    if product_found_anywhere and self._is_row_complete(record):
-                        self.on_log(f"Row complete for '{record.product_name}'. Skipping remaining websites.")
-                        break
+                    done_so_far = sum(1 for r in self.workbook_manager.get_all_records() if r.status == "Done")
+                    record.status = "In Progress"
+                    self.workbook_manager.update_record(record)
+                    self.on_row_updated(record.to_summary_dict())
 
                     self.on_progress({
-                        "current": prod_idx + completed_count,
+                        "current": done_so_far,
                         "total": total_count,
                         "product_name": record.product_name,
                         "site": site_url,
-                        "stage": f"Checking Site {site_idx}/{len(websites)}",
+                        "stage": f"Pass {site_idx}/{len(websites)} ({pass_idx}/{len(pending_for_pass)})",
                     })
+                    self.on_log(f"[Pass {site_idx} • {pass_idx}/{len(pending_for_pass)}] Searching '{record.product_name}' on {site_url}...")
 
-                    # Perform search on this website
                     candidates = await SiteScraper.search_product(
                         page=page,
                         site_url=site_url,
@@ -249,7 +241,6 @@ class ScraperOrchestrator:
                         skip_preowned=self.settings.skip_preowned_devices,
                     )
 
-                    # Check for human verification challenge
                     if await PopupGuard.detect_human_verification(page):
                         self.on_log(f"Human verification challenge detected on {site_url}! Pausing for user...")
                         self.on_captcha_alert(site_url)
@@ -258,12 +249,15 @@ class ScraperOrchestrator:
 
                     if not candidates:
                         self.on_log(f"No match for '{record.product_name}' on {site_url}")
+                        # Keep Pending/Partial so next website pass checks it
+                        record.status = "Partial" if record.scraped_sources else "Pending"
+                        self.workbook_manager.update_record(record)
+                        self.on_row_updated(record.to_summary_dict())
                         continue
 
-                    product_found_anywhere = True
-                    record.scraped_sources.append(site_url)
+                    if site_url not in record.scraped_sources:
+                        record.scraped_sources.append(site_url)
 
-                    # Scrape matched candidate page(s) (handles separate Official/Unofficial listings)
                     for cand in candidates:
                         cand_url = cand["url"]
                         self.on_log(f"Scraping product page: {cand_url}")
@@ -325,24 +319,27 @@ class ScraperOrchestrator:
                         record.specifications = clean_specs
                         record.description_html = clean_desc
 
-                # End of waterfall for this product
-                if product_found_anywhere:
                     record.status = "Done" if self._is_row_complete(record) else "Partial"
-                else:
-                    record.status = "Not Found"
-                    record.specifications = "not found"
-                    record.description_html = "not found"
+                    self.workbook_manager.update_record(record)
+                    self.workbook_manager.save_workbook()
+                    self.on_row_updated(record.to_summary_dict())
+                    self.on_log(f"Saved '{record.product_name}' -> Status: {record.status}")
 
-                # Update memory and incrementally save to Excel
-                self.workbook_manager.update_record(record)
+                    # Check RAM ceiling and recycle browser context if needed
+                    if self.resource_guard.should_recycle_browser():
+                        self.on_log("RAM ceiling reached (>85%). Recycling Incognito browser context...")
+                        page = await self.browser_manager.recycle_context()
+
+            # Finalize any products still unmatched after all website passes
+            if not self.stop_event.is_set():
+                for rec in self.workbook_manager.get_all_records():
+                    if rec.status in ("Pending", "In Progress") and not rec.scraped_sources:
+                        rec.status = "Not Found"
+                        rec.specifications = "not found"
+                        rec.description_html = "not found"
+                        self.workbook_manager.update_record(rec)
+                        self.on_row_updated(rec.to_summary_dict())
                 self.workbook_manager.save_workbook()
-                self.on_row_updated(record.to_summary_dict())
-                self.on_log(f"Saved '{record.product_name}' -> Status: {record.status}")
-
-                # Check RAM ceiling and recycle browser context if needed
-                if self.resource_guard.should_recycle_browser():
-                    self.on_log("RAM ceiling reached (>85%). Recycling Incognito browser context...")
-                    page = await self.browser_manager.recycle_context()
 
             # Finished all records
             self.on_log("Scraping queue complete! All rows saved to Excel.")

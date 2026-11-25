@@ -29,33 +29,59 @@ class VariantExtractor:
     @classmethod
     async def extract_page_prices(cls, page: Page) -> PricePair:
         """Extracts current Regular and Discounted prices from active page DOM,
-        ignoring EMI/monthly installments, 'Save X' badges, and booking amounts.
+        supporting both semantic classes (.price, del, ins) AND Tailwind utility layouts
+        (e.g. '৳500 (Cash Price)' + '<del>৳785</del>'), while ignoring EMI, Save/OFF, and Booking figures.
         """
         try:
             prices_info = await page.evaluate(r"""() => {
                 let reg = null;
                 let disc = null;
 
+                const isExcludedAncestor = (el) => {
+                    return !el || Boolean(el.closest("header, footer, nav, .related, .upsells, [class*='related' i], #tabDescription, #tabWarranty, table"));
+                };
+
+                const isNoiseText = (txt) => {
+                    const lower = (txt || "").toLowerCase();
+                    return /\b(emi|\/mo|\/month|per month|installment|booking|advance|save\b|off\b|orders above)\b/.test(lower);
+                };
+
                 const isNoisePrice = (el) => {
-                    if (!el) return true;
-                    if (el.closest("header, footer, nav, .related, .upsells, [class*='related' i]")) return true;
-                    const ctxText = ((el.parentElement ? el.parentElement.innerText : "") + " " + el.innerText).toLowerCase();
-                    return /\b(emi|\/mo|\/month|per month|installment|booking|advance|save\s+[৳$]|off)\b/.test(ctxText);
+                    if (isExcludedAncestor(el)) return true;
+                    const own = (el.innerText || "").trim();
+                    if (!own || !/\d/.test(own)) return true;
+                    if (isNoiseText(own)) return true;
+                    // Check direct parent only if parent is small (avoids rejecting a valid price inside a large container that also has an OFF badge)
+                    const parentTxt = el.parentElement ? (el.parentElement.innerText || "").trim() : "";
+                    if (parentTxt.length < 60 && isNoiseText(parentTxt)) return true;
+                    return false;
                 };
 
                 const findValid = (selector) => {
                     const els = Array.from(document.querySelectorAll(selector));
                     for (const el of els) {
-                        const txt = (el.innerText || "").trim();
-                        if (txt && /\d/.test(txt) && !isNoisePrice(el)) {
-                            return el;
-                        }
+                        if (!isNoisePrice(el)) return el;
                     }
                     return null;
                 };
 
+                // 1. Check struck-through regular price (<del>, .price-old, .line-through)
                 const delElem = findValid("del, .price-old, .old-price, .line-through, .original-price");
-                const saleElem = findValid("ins, .special-price, .price-new, .sale-price, .discount-price, .current-price");
+                let saleElem = findValid("ins, .special-price, .price-new, .sale-price, .discount-price, .current-price");
+
+                // 2. Tailwind-aware lookup: if <del> exists but no semantic sale class, look in nearby price wrapper for bold currency text
+                if (delElem && !saleElem) {
+                    const wrapper = delElem.closest("div.group, div.flex, section") || delElem.parentElement?.parentElement;
+                    if (wrapper) {
+                        const candidates = Array.from(wrapper.querySelectorAll("p, span, strong, b, div")).filter(el => {
+                            if (el === delElem || el.contains(delElem) || delElem.contains(el)) return false;
+                            if (el.children.length > 1) return false;
+                            const txt = (el.innerText || "").trim();
+                            return /^[৳$£€]?\s*[\d,]+(?:\.\d{2})?(\s*(tk|bdt))?$/i.test(txt) && !isNoiseText(txt);
+                        });
+                        if (candidates.length > 0) saleElem = candidates[0];
+                    }
+                }
 
                 if (delElem && saleElem) {
                     reg = delElem.innerText;
@@ -66,7 +92,25 @@ class VariantExtractor:
                     if (pElem && pElem !== delElem) disc = pElem.innerText;
                 } else {
                     const pElem = findValid(".price, .product-price, .price-new, .current-price, [data-price]");
-                    if (pElem) reg = pElem.innerText;
+                    if (pElem) {
+                        reg = pElem.innerText;
+                    } else {
+                        // 3. Tailwind-aware hero price fallback (e.g. '৳650' next to '(Cash Price)' with no <del> and no .price class)
+                        const heroPrices = Array.from(document.querySelectorAll("main p, main span, main strong, section p, section span, div p, div span")).filter(el => {
+                            if (isExcludedAncestor(el)) return false;
+                            if (el.children.length > 1) return false;
+                            const txt = (el.innerText || "").trim();
+                            if (!/[৳$£€]\s*[\d,]+|[\d,]+\s*(tk|bdt)\b/i.test(txt)) return false;
+                            if (txt.length > 35 || isNoiseText(txt)) return false;
+                            const style = window.getComputedStyle(el);
+                            const fontSize = parseFloat(style.fontSize) || 14;
+                            const fontWeight = parseInt(style.fontWeight, 10) || 400;
+                            return fontSize >= 17 || fontWeight >= 600;
+                        });
+                        if (heroPrices.length > 0) {
+                            reg = heroPrices[0].innerText;
+                        }
+                    }
                 }
                 return { reg, disc };
             }""")
@@ -169,6 +213,28 @@ class VariantExtractor:
                     }
                 });
 
+                // Pattern D: Tailwind / label-anchored variant cards (e.g. <p>Size:</p> + sibling div of <button>1m</button><button>2m</button>)
+                const VARIANT_LABEL_RE = /^(size|length|color|colour|storage|capacity|ram|memory|region|country|version|type|warranty|official|unofficial|sim|connectivity|edition|chip|band|strap|model|option|variant)s?\s*:?$/i;
+                const ACTION_BTN_RE = /^(add to cart|shop now|buy now|order now|messenger|whatsapp|compare|wishlist|\+|\-|\d+)$/i;
+                const labelNodes = Array.from(document.querySelectorAll("p, label, span, h4, h5, div"));
+                labelNodes.forEach(node => {
+                    if (node.closest("header, footer, nav, #tabDescription, #tabSpecification, table")) return;
+                    if (node.children.length > 2) return;
+                    const rawTxt = (node.innerText || "").trim();
+                    if (!rawTxt || rawTxt.length > 35 || !VARIANT_LABEL_RE.test(rawTxt)) return;
+
+                    const heading = rawTxt.replace(/[:*]/g, "").trim().toLowerCase();
+                    const container = node.nextElementSibling || node.parentElement;
+                    if (!container) return;
+                    const btns = Array.from(container.querySelectorAll("button, a[role='button']")).filter(b => {
+                        const lbl = (b.getAttribute("data-value") || b.getAttribute("title") || b.innerText || "").trim();
+                        return lbl && lbl.length <= 40 && !ACTION_BTN_RE.test(lbl);
+                    });
+                    if (btns.length >= 2) {
+                        processBlock(heading, btns);
+                    }
+                });
+
                 return result;
             }""")
             return groups or {}
@@ -263,22 +329,45 @@ class VariantExtractor:
                             return true;
                         }""", {"selName": item.get("select_name"), "optVal": item.get("option_value")})
                     else:
-                        clicked = await page.evaluate(r"""(label) => {
-                            const candidates = Array.from(document.querySelectorAll("button, a, .swatch, label, span, div"));
-                            for (const el of candidates) {
-                                if (el.innerText.trim().toLowerCase() === label.toLowerCase() ||
-                                    el.getAttribute("title")?.trim().toLowerCase() === label.toLowerCase() ||
-                                    el.getAttribute("data-value")?.trim().toLowerCase() === label.toLowerCase()) {
-                                    el.scrollIntoView({ block: "nearest" });
-                                    el.click();
-                                    return true;
+                        clicked = False
+                        # Prefer Playwright's native mouse click first (triggers React/Next.js synthetic events reliably)
+                        try:
+                            btn_loc = page.get_by_role("button", name=label, exact=True).first
+                            if await btn_loc.is_visible(timeout=300):
+                                await btn_loc.click(timeout=1200, force=True)
+                                clicked = True
+                        except Exception:
+                            clicked = False
+
+                        if not clicked:
+                            clicked = await page.evaluate(r"""(label) => {
+                                const target = label.toLowerCase();
+                                const selectorOrder = [
+                                    "button",
+                                    "a[role='button'], a.swatch, .swatch-element",
+                                    "input[type='radio'] + label, label",
+                                    "span, div"
+                                ];
+                                for (const sel of selectorOrder) {
+                                    const candidates = Array.from(document.querySelectorAll(sel));
+                                    for (const el of candidates) {
+                                        if (el.closest("header, footer, nav")) continue;
+                                        const txt = (el.innerText || "").trim().toLowerCase();
+                                        const titleAttr = (el.getAttribute("title") || "").trim().toLowerCase();
+                                        const valAttr = (el.getAttribute("data-value") || "").trim().toLowerCase();
+                                        if (txt === target || titleAttr === target || valAttr === target) {
+                                            const clickTarget = el.closest("button, a, label") || el;
+                                            clickTarget.scrollIntoView({ block: "nearest" });
+                                            clickTarget.click();
+                                            return true;
+                                        }
+                                    }
                                 }
-                            }
-                            return false;
-                        }""", label)
+                                return false;
+                            }""", label)
 
                     if clicked:
-                        await asyncio.sleep(0.35)
+                        await asyncio.sleep(0.6)
                         price_for_item = await cls.extract_page_prices(page)
 
                         # Capture any updated gallery image src
