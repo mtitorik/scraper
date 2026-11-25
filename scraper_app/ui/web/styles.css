@@ -1731,6 +1731,109 @@ tr.row-flash {
   }
 }
 
+.table-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.table-header-title strong {
+  font-size: 13.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.table-header-hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Inline Per-Product Variant Dropdown & Expanded Sub-Table */
+.variant-dropdown-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+.variant-dropdown-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+.variant-dropdown-btn.open {
+  background: var(--accent-soft);
+  border-color: var(--accent-primary);
+  color: var(--accent-text);
+}
+.variant-dropdown-btn svg {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.variant-dropdown-btn.open svg {
+  transform: rotate(180deg);
+}
+
+.variant-expand-row td {
+  padding: 0 !important;
+  background: var(--bg-input) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.variant-expand-panel {
+  padding: 12px 18px 14px 32px;
+  animation: tabEnter 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.variant-subtable {
+  width: 100%;
+  max-width: 720px;
+  border-collapse: collapse;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  font-size: 12px;
+}
+.variant-subtable th {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 7px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+.variant-subtable td {
+  padding: 7px 12px !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  background: transparent !important;
+}
+.variant-subtable tr:last-child td {
+  border-bottom: none !important;
+}
+.variant-cat-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
 .hidden {
   display: none !important;
 }

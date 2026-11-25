@@ -186,54 +186,19 @@ class WorkbookManager:
                     elif rec.status == "In Progress":
                         cell.font = Font(name="Calibri", size=11, bold=True, color="D97706")
 
-        # Setup Sheet 2: All Variant Combinations
-        ws2 = wb.create_sheet(title=self.SHEET_VARIANTS)
-        variant_headers = [
-            "Product name",
-            "Source Website",
-            "Page Link",
-            "Official/Unofficial",
-            "Region",
-            "Storage",
-            "Colour",
-            "Extra Attributes",
-            "Regular Price",
-            "Discounted Price",
-            "Stock Status",
-        ]
-        ws2.append(variant_headers)
-        for col_idx in range(1, len(variant_headers) + 1):
-            cell = ws2.cell(row=1, column=col_idx)
-            cell.font = header_font
-            cell.fill = PatternFill(start_color="334155", end_color="334155", fill_type="solid")
-            cell.alignment = align_center
-
-        v_row_idx = 2
-        for rec in self.records.values():
-            for v_combo in rec.variant_combinations:
-                v_dict = v_combo.to_row_dict()
-                ws2.append([v_dict[h] for h in variant_headers])
-                for c_idx in range(1, len(variant_headers) + 1):
-                    cell = ws2.cell(row=v_row_idx, column=c_idx)
-                    cell.border = border_thin
-                    cell.alignment = align_left
-                v_row_idx += 1
-
         # Adjust column widths automatically
-        for sheet in (ws1, ws2):
-            for col in sheet.columns:
-                max_len = 0
-                col_letter = get_column_letter(col[0].column)
-                header_name = str(col[0].value or "")
-                # Ignore very long content columns for width calculation
-                if header_name in ("specification", "description"):
-                    sheet.column_dimensions[col_letter].width = 30
-                    continue
-                for cell in col[:50]:  # sample top 50 rows
-                    val_str = str(cell.value or "")
-                    if len(val_str) > max_len:
-                        max_len = len(val_str)
-                sheet.column_dimensions[col_letter].width = max(max_len + 3, 14)
+        for col in ws1.columns:
+            max_len = 0
+            col_letter = get_column_letter(col[0].column)
+            header_name = str(col[0].value or "")
+            if header_name in ("specification", "description"):
+                ws1.column_dimensions[col_letter].width = 30
+                continue
+            for cell in col[:50]:
+                val_str = str(cell.value or "")
+                if len(val_str) > max_len:
+                    max_len = len(val_str)
+            ws1.column_dimensions[col_letter].width = max(max_len + 3, 14)
 
         # Atomic write with lock guard
         self.output_path.parent.mkdir(parents=True, exist_ok=True)

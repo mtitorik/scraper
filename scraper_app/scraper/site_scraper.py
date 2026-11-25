@@ -642,7 +642,11 @@ class SiteScraper:
             }""")
             result["warranty"] = warranty_text
 
-            # 5. Extract initial high-resolution gallery images (supports data-large_image, zoom, srcset, data-src)
+            # 5. Extract Hero Product Gallery-Only images (main product photo + thumbnail strip ONLY;
+            # strictly excludes Related Products, Description banners, logos, and other product cards!)
+            await page.evaluate("window.scrollTo(0, 0)")
+            await asyncio.sleep(0.25)
+
             gallery_images = await page.evaluate(r"""() => {
                 const imgs = [];
                 const pickBestSrcset = (srcset) => {
@@ -661,27 +665,134 @@ class SiteScraper:
                     return bestUrl;
                 };
 
-                const imgEls = document.querySelectorAll(
-                    ".product-gallery img, .woocommerce-product-gallery img, .product-image img, .slider-thumb img, [data-zoom-image], [data-large_image], .gallery-item img, main img"
-                );
-                imgEls.forEach(img => {
-                    if (img.closest("header, footer, nav")) return;
-                    const src =
+                const isExcluded = (img) => {
+                    if (!img) return true;
+                    if (img.closest("header, footer, nav, [role='dialog'], [class*='modal' i], [class*='popup' i], .related, .upsells, [class*='related' i], [class*='recommend' i], [class*='recent' i], #tabDescription, #tabSpecification, #tabWarranty, #tab-description, #tab-specification")) {
+                        return true;
+                    }
+                    // Exclude any image inside a fixed overlay (promo popups, chat widgets)
+                    let p = img;
+                    while (p && p !== document.body) {
+                        if (window.getComputedStyle(p).position === "fixed") return true;
+                        p = p.parentElement;
+                    }
+                    // Exclude images inside links to OTHER product pages (related product cards!)
+                    const parentLink = img.closest("a[href]");
+                    if (parentLink) {
+                        const href = (parentLink.getAttribute("href") || "").toLowerCase();
+                        if (/\/(product|products|item|p)\//.test(href) && !href.endsWith(".jpg") && !href.endsWith(".jpeg") && !href.endsWith(".png") && !href.endsWith(".webp")) {
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+
+                const extractSrc = (img) => {
+                    let src =
                         img.getAttribute("data-large_image") ||
                         img.getAttribute("data-zoom-image") ||
                         pickBestSrcset(img.getAttribute("srcset")) ||
                         img.getAttribute("data-src") ||
                         img.src || "";
-                    if (src && src.startsWith("http") && !src.startsWith("data:") && !/icon|logo|badge|payment|flag/i.test(src) && !src.endsWith(".svg")) {
-                        if ((img.naturalWidth === 0 || img.naturalWidth >= 150) && !imgs.includes(src)) {
-                            imgs.push(src);
-                        }
+                    // Also check if wrapped in an anchor pointing directly to full-res image
+                    const link = img.closest("a[href]");
+                    if (link && /\.(jpg|jpeg|png|webp)(\?|$)/i.test(link.href || "")) {
+                        src = link.href;
                     }
+                    if (!src || !src.startsWith("http") || src.startsWith("data:")) return "";
+                    if (/icon|logo|badge|payment|flag|avatar|spinner|placeholder|popup|celebration|anniversary/i.test(src) || src.endsWith(".svg")) return "";
+                    return src;
+                };
+
+                const getMediaKey = (url) => {
+                    try {
+                        const decoded = decodeURIComponent(url);
+                        const m = decoded.match(/\/([^\/?#]+\.(?:jpg|jpeg|png|webp))/i);
+                        return m ? m[1].toLowerCase() : url;
+                    } catch {
+                        return url;
+                    }
+                };
+
+                const byKey = new Map();
+                const addGalleryImg = (src) => {
+                    const key = getMediaKey(src);
+                    const isThumb = /\/thumb\/|-\d+x\d+\./i.test(decodeURIComponent(src));
+                    if (!byKey.has(key)) {
+                        byKey.set(key, { src, isThumb });
+                    } else if (byKey.get(key).isThumb && !isThumb) {
+                        // Prefer full-res /large/ version over /thumb/ version of the exact same photo!
+                        byKey.set(key, { src, isThumb });
+                    }
+                };
+
+                const collectFromContainer = (container) => {
+                    if (!container) return;
+                    const els = Array.from(container.querySelectorAll("img"));
+                    els.forEach(img => {
+                        if (isExcluded(img)) return;
+                        const rect = img.getBoundingClientRect();
+                        if (rect.width > 0 && rect.width < 36) return;
+                        const src = extractSrc(img);
+                        if (src) addGalleryImg(src);
+                    });
+                };
+
+                // Tier 1: Explicit product gallery container (WooCommerce / OpenCart / Shopify / custom)
+                const explicitSelectors = [
+                    ".woocommerce-product-gallery",
+                    ".product-gallery",
+                    ".product-images",
+                    ".product-image-gallery",
+                    ".product-media-gallery",
+                    "[data-testid*='gallery' i]"
+                ];
+                for (const sel of explicitSelectors) {
+                    const el = document.querySelector(sel);
+                    if (el) {
+                        collectFromContainer(el);
+                        if (byKey.size > 0) return Array.from(byKey.values()).map(v => v.src);
+                    }
+                }
+
+                // Tier 2: Tailwind / Next.js Hero Gallery Discovery
+                const allImgs = Array.from(document.querySelectorAll("img")).filter(img => {
+                    if (isExcluded(img)) return false;
+                    const rect = img.getBoundingClientRect();
+                    return rect.top >= 0 && rect.top < 780 && rect.width >= 200 && rect.height >= 200;
                 });
-                return imgs;
+                allImgs.sort((a, b) => {
+                    const ra = a.getBoundingClientRect();
+                    const rb = b.getBoundingClientRect();
+                    return (rb.width * rb.height) - (ra.width * ra.height);
+                });
+
+                if (allImgs.length > 0) {
+                    const heroImg = allImgs[0];
+                    let galleryRoot = heroImg.parentElement;
+                    let cur = heroImg.parentElement;
+                    for (let depth = 0; depth < 4 && cur && cur.parentElement; depth++) {
+                        const next = cur.parentElement;
+                        if (next.querySelector("h1") || next.tagName === "MAIN" || next.tagName === "BODY") {
+                            break;
+                        }
+                        const imgCount = next.querySelectorAll("img").length;
+                        if (imgCount >= 1 && imgCount <= 16) {
+                            galleryRoot = next;
+                        }
+                        cur = next;
+                    }
+                    collectFromContainer(galleryRoot);
+                }
+
+                return Array.from(byKey.values()).map(v => v.src);
             }""")
 
-            # 6. Run variant click-loop to gather prices, options, and combo rows
+            # 6. Dismiss any delayed promo popup & scroll cleanly to top before clicking variant buttons
+            await PopupGuard.dismiss_promotional_popups(page)
+            await page.evaluate("window.scrollTo(0, 0)")
+            await asyncio.sleep(0.25)
+
             def_price, attr_options, combos, extra_imgs = await VariantExtractor.extract_all_variants_and_combos(
                 page=page,
                 product_name=target_product_name,

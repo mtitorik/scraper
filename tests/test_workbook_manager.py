@@ -22,10 +22,9 @@ def test_workbook_initialization_and_immediate_save():
         assert success is True
         assert output_path.exists()
 
-        # Check sheets in output workbook
+        # Check single clean Products sheet in output workbook
         wb = openpyxl.load_workbook(str(output_path))
         assert WorkbookManager.SHEET_PRODUCTS in wb.sheetnames
-        assert WorkbookManager.SHEET_VARIANTS in wb.sheetnames
 
         ws1 = wb[WorkbookManager.SHEET_PRODUCTS]
         headers = [c.value for c in ws1[1]]
@@ -105,17 +104,6 @@ def test_dynamic_columns_and_discounted_price_placement():
         img_cell = ws1.cell(row=2, column=img_col_idx)
         assert img_cell.hyperlink is not None
         assert "file:///" in img_cell.hyperlink.target
-
-        # Verify Sheet 2 contains variant combination
-        ws2 = wb[WorkbookManager.SHEET_VARIANTS]
-        v_rows = list(ws2.iter_rows(values_only=True))
-        assert len(v_rows) == 2  # header + 1 combo
-        assert v_rows[1][0] == "iPhone 16 Pro"
-        assert v_rows[1][3] == "Unofficial"
-        assert v_rows[1][4] == "USA"
-        assert v_rows[1][6] == "Black Titanium"
-        assert v_rows[1][8] == "135000"
-        assert v_rows[1][9] == "129000"
 
 
 def test_resume_from_existing_xlsx():

@@ -330,11 +330,12 @@ class VariantExtractor:
                         }""", {"selName": item.get("select_name"), "optVal": item.get("option_value")})
                     else:
                         clicked = False
-                        # Prefer Playwright's native mouse click first (triggers React/Next.js synthetic events reliably)
+                        # Prefer Playwright's native mouse click first (scrolls cleanly into view & triggers React/Next.js state)
                         try:
                             btn_loc = page.get_by_role("button", name=label, exact=True).first
-                            if await btn_loc.is_visible(timeout=300):
-                                await btn_loc.click(timeout=1200, force=True)
+                            await btn_loc.scroll_into_view_if_needed(timeout=1000)
+                            if await btn_loc.is_visible(timeout=500):
+                                await btn_loc.click(timeout=2000)
                                 clicked = True
                         except Exception:
                             clicked = False
@@ -367,7 +368,7 @@ class VariantExtractor:
                             }""", label)
 
                     if clicked:
-                        await asyncio.sleep(0.6)
+                        await asyncio.sleep(0.8)
                         price_for_item = await cls.extract_page_prices(page)
 
                         # Capture any updated gallery image src

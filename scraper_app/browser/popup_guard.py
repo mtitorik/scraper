@@ -45,17 +45,56 @@ class PopupGuard:
 
     @classmethod
     async def dismiss_promotional_popups(cls, page: Page) -> bool:
-        """Attempts to find and click promotional or cookie overlays without breaking page state."""
+        """Attempts to find and click promotional or cookie overlays (including Tailwind fixed modals)
+        without breaking page state.
+        """
         dismissed_any = False
         for selector in cls.PROMO_CLOSE_SELECTORS:
             try:
                 locator = page.locator(selector).first
-                if await locator.is_visible(timeout=300):
+                if await locator.is_visible(timeout=250):
                     await locator.click(timeout=800)
                     dismissed_any = True
-                    await asyncio.sleep(0.3)
+                    await asyncio.sleep(0.25)
             except Exception:
                 continue
+
+        # Also handle Tailwind/Next.js fixed modal popups (e.g. promo banner with SVG X button)
+        try:
+            closed_fixed = await page.evaluate(r"""() => {
+                let closed = false;
+                const overlays = Array.from(document.querySelectorAll("[role='dialog'], div.fixed, div[class*='modal' i], div[class*='popup' i]"));
+                for (const ov of overlays) {
+                    const style = window.getComputedStyle(ov);
+                    const z = parseInt(style.zIndex, 10) || 0;
+                    const rect = ov.getBoundingClientRect();
+                    if ((style.position === "fixed" && z >= 20 && rect.width > 200 && rect.height > 200) || ov.getAttribute("role") === "dialog") {
+                        const btns = Array.from(ov.querySelectorAll("button, a[role='button']"));
+                        // Look for small close button (usually an X icon with little/no text)
+                        const closeBtn = btns.find(b => {
+                            const txt = (b.innerText || "").trim();
+                            return txt === "" || txt === "×" || txt === "✕" || /^close|dismiss|cancel|skip$/i.test(txt);
+                        });
+                        if (closeBtn) {
+                            closeBtn.click();
+                            closed = true;
+                        }
+                    }
+                }
+                return closed;
+            }""")
+            if closed_fixed:
+                dismissed_any = True
+                await asyncio.sleep(0.3)
+        except Exception:
+            pass
+
+        # Press Escape as a safe final modal dismissal
+        try:
+            await page.keyboard.press("Escape")
+        except Exception:
+            pass
+
         return dismissed_any
 
     @classmethod

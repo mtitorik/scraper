@@ -1,11 +1,10 @@
 // State management
 let appSettings = {};
-let activeSheet = "sheet1";
 let inputMode = "file";
 let statusFilter = "all";
 let lastUpdatedProductName = null;
+let expandedProducts = new Set(); // product_name strings with expanded variant dropdowns
 let productsMap = new Map(); // product_name -> summary dict
-let variantsList = [];
 let isScrapingRunning = false;
 let isScrapingPaused = false;
 let activeDrawerDetail = null;
@@ -94,13 +93,9 @@ const elements = {
   kpiNotFound: document.getElementById("kpi-not-found"),
   kpiVariants: document.getElementById("kpi-variants"),
 
-  // Tables
-  tabSheet1: document.getElementById("tab-sheet-1"),
-  tabSheet2: document.getElementById("tab-sheet-2"),
+  // Table
   tableSheet1Elem: document.getElementById("table-sheet-1-elem"),
-  tableSheet2Elem: document.getElementById("table-sheet-2-elem"),
   tbodySheet1: document.getElementById("tbody-sheet-1"),
-  tbodySheet2: document.getElementById("tbody-sheet-2"),
   tableSearch: document.getElementById("table-search"),
   tableRowCount: document.getElementById("table-row-count"),
 
@@ -344,8 +339,7 @@ const switchTab = (tabId) => {
     p.classList.toggle("active", p.id === tabId);
   });
   if (tabId === "tab-results") {
-    if (activeSheet === "sheet1") renderSheet1();
-    else renderSheet2();
+    renderSheet1();
   }
 };
 
@@ -390,11 +384,7 @@ document.querySelectorAll(".kpi-card.clickable").forEach((card) => {
     document.querySelectorAll(".kpi-card.clickable").forEach((c) => {
       c.classList.toggle("active-filter", c === card);
     });
-    if (activeSheet !== "sheet1") {
-      elements.tabSheet1.click();
-    } else {
-      renderSheet1();
-    }
+    renderSheet1();
   });
 });
 
@@ -416,25 +406,6 @@ window.addEventListener("keydown", (e) => {
       elements.tableSearch.focus();
     }
   }
-});
-
-// Sheet Tab Switching
-elements.tabSheet1.addEventListener("click", () => {
-  activeSheet = "sheet1";
-  elements.tabSheet1.classList.add("active");
-  elements.tabSheet2.classList.remove("active");
-  elements.tableSheet1Elem.classList.remove("hidden");
-  elements.tableSheet2Elem.classList.add("hidden");
-  renderSheet1();
-});
-
-elements.tabSheet2.addEventListener("click", () => {
-  activeSheet = "sheet2";
-  elements.tabSheet2.classList.add("active");
-  elements.tabSheet1.classList.remove("active");
-  elements.tableSheet2Elem.classList.remove("hidden");
-  elements.tableSheet1Elem.classList.add("hidden");
-  renderSheet2();
 });
 
 // Theme Segmented Switcher
@@ -547,12 +518,21 @@ const updateRowInTable = (record) => {
   productsMap.set(record.product_name, record);
   lastUpdatedProductName = record.product_name;
   updateKpiStrip();
-  if (activeSheet === "sheet1") {
-    renderSheet1();
-  }
+  renderSheet1();
 };
 
-// Render Sheet 1 (Products)
+// Toggle Inline Variant Dropdown for a Product Row
+window.toggleVariantDropdown = (productName, evt) => {
+  if (evt) evt.stopPropagation();
+  if (expandedProducts.has(productName)) {
+    expandedProducts.delete(productName);
+  } else {
+    expandedProducts.add(productName);
+  }
+  renderSheet1();
+};
+
+// Render Products Table (with inline expandable Variant Dropdowns)
 const renderSheet1 = () => {
   const filter = (elements.tableSearch.value || "").toLowerCase();
   const records = Array.from(productsMap.values()).filter((r) => {
@@ -565,7 +545,7 @@ const renderSheet1 = () => {
 
   if (records.length === 0) {
     elements.tbodySheet1.innerHTML = `<tr>
-      <td colspan="8" class="empty-state-cell">
+      <td colspan="9" class="empty-state-cell">
         <div class="empty-state-box">
           <div class="empty-state-icon" aria-hidden="true">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
@@ -586,6 +566,7 @@ const renderSheet1 = () => {
 
   const externalSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`;
   const folderSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
+  const chevronSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
 
   let html = "";
   for (const r of records) {
@@ -593,6 +574,32 @@ const renderSheet1 = () => {
     const regPrice = r.default_price ? r.default_price.regular_display : "-";
     const discPrice = r.default_price ? r.default_price.discounted_display || "-" : "-";
     const safeNameArg = escapeHtml(JSON.stringify(r.product_name));
+
+    // Build flat variant rows from attribute_options
+    const attrOpts = r.attribute_options || {};
+    const flatVariants = [];
+    for (const [cat, entries] of Object.entries(attrOpts)) {
+      if (Array.isArray(entries)) {
+        for (const e of entries) {
+          flatVariants.push({
+            category: cat,
+            label: e.label,
+            reg: e.prices ? e.prices.regular_display : "not found",
+            disc: e.prices ? (e.prices.discounted_display || "-") : "-",
+          });
+        }
+      }
+    }
+
+    const isExpanded = expandedProducts.has(r.product_name);
+    const catNames = Object.keys(attrOpts);
+    const variantBtnLabel = catNames.length === 1
+      ? `${catNames[0].charAt(0).toUpperCase() + catNames[0].slice(1)} (${flatVariants.length})`
+      : `${flatVariants.length} variants`;
+
+    const variantCell = flatVariants.length > 0
+      ? `<button class="variant-dropdown-btn${isExpanded ? " open" : ""}" type="button" onclick="toggleVariantDropdown(${safeNameArg}, event)">${chevronSvg}<span>${escapeHtml(variantBtnLabel)}</span></button>`
+      : `<span class="desc-snippet">-</span>`;
 
     const folderCell = r.image_folder
       ? `<button class="cell-link-pill" type="button" onclick="openPath(${escapeHtml(JSON.stringify(r.image_folder))}, event)">${folderSvg}<span>Open Folder</span></button>`
@@ -622,66 +629,42 @@ const renderSheet1 = () => {
       <td><span class="status-cell ${statusCls}">${escapeHtml(r.status || "Pending")}</span></td>
       <td><span class="price-val">${escapeHtml(regPrice)}</span></td>
       <td><span class="price-val ${discPrice !== "-" ? "discount" : ""}">${escapeHtml(discPrice)}</span></td>
+      <td>${variantCell}</td>
       <td>${folderCell}</td>
       <td>${linkCell}</td>
       <td><span class="specs-snippet" title="${escapeHtml(r.specifications || "")}">${escapeHtml(r.specifications || "-")}</span></td>
       <td>${descCell}</td>
     </tr>`;
+
+    // Inline Expanded Variant Sub-Row
+    if (isExpanded && flatVariants.length > 0) {
+      const subRows = flatVariants.map((v) => `<tr>
+        <td><span class="variant-cat-pill">${escapeHtml(v.category)}</span></td>
+        <td><strong>${escapeHtml(v.label)}</strong></td>
+        <td><span class="price-val">${escapeHtml(v.reg)}</span></td>
+        <td><span class="price-val ${v.disc !== "-" ? "discount" : ""}">${escapeHtml(v.disc)}</span></td>
+      </tr>`).join("");
+
+      html += `<tr class="variant-expand-row">
+        <td colspan="9">
+          <div class="variant-expand-panel">
+            <table class="variant-subtable">
+              <thead>
+                <tr>
+                  <th>Attribute</th>
+                  <th>Variant Option</th>
+                  <th>Regular Price</th>
+                  <th>Discounted Price</th>
+                </tr>
+              </thead>
+              <tbody>${subRows}</tbody>
+            </table>
+          </div>
+        </td>
+      </tr>`;
+    }
   }
   elements.tbodySheet1.innerHTML = html;
-};
-
-// Render Sheet 2 (Variants)
-const renderSheet2 = async () => {
-  const filter = (elements.tableSearch.value || "").toLowerCase();
-  const data = await callApi("get_current_table_data");
-  if (data && data.variants) {
-    variantsList = data.variants;
-  }
-
-  const filtered = variantsList.filter((v) =>
-    (v["Product name"] || "").toLowerCase().includes(filter) ||
-    (v["Colour"] || "").toLowerCase().includes(filter) ||
-    (v["Region"] || "").toLowerCase().includes(filter)
-  );
-
-  elements.tableRowCount.textContent = `${filtered.length} variant row${filtered.length === 1 ? "" : "s"}`;
-
-  if (filtered.length === 0) {
-    elements.tbodySheet2.innerHTML = `<tr>
-      <td colspan="10" class="empty-state-cell">
-        <div class="empty-state-box">
-          <div class="empty-state-title">No variant combinations captured yet</div>
-          <div class="empty-state-sub">Every clicked color, storage, region, and official/unofficial price will appear here live.</div>
-        </div>
-      </td>
-    </tr>`;
-    return;
-  }
-
-  const externalSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`;
-
-  let html = "";
-  for (const v of filtered) {
-    const pageUrl = v["Page Link"] || "";
-    const linkHtml = pageUrl && pageUrl.startsWith("http")
-      ? `<button class="cell-link-pill" type="button" title="${escapeHtml(pageUrl)}" onclick="openExternalUrl(${escapeHtml(JSON.stringify(pageUrl))}, event)">${externalSvg}<span>${escapeHtml(formatUrlLabel(pageUrl))}</span></button>`
-      : `<span class="desc-snippet">-</span>`;
-
-    html += `<tr>
-      <td><strong>${escapeHtml(v["Product name"] || "")}</strong></td>
-      <td>${escapeHtml(formatUrlLabel(v["Source Website"] || "-"))}</td>
-      <td>${escapeHtml(v["Official/Unofficial"] || "-")}</td>
-      <td>${escapeHtml(v["Region"] || "-")}</td>
-      <td>${escapeHtml(v["Storage"] || "-")}</td>
-      <td>${escapeHtml(v["Colour"] || "-")}</td>
-      <td><span class="price-val">${escapeHtml(v["Regular Price"] || "-")}</span></td>
-      <td><span class="price-val discount">${escapeHtml(v["Discounted Price"] || "-")}</span></td>
-      <td>${escapeHtml(v["Stock Status"] || "-")}</td>
-      <td>${linkHtml}</td>
-    </tr>`;
-  }
-  elements.tbodySheet2.innerHTML = html;
 };
 
 // Slide-Over Product Inspector Drawer
@@ -1123,8 +1106,7 @@ elements.brandName.addEventListener("input", syncSidebarSubtitle);
 
 // Table search filter
 elements.tableSearch.addEventListener("input", () => {
-  if (activeSheet === "sheet1") renderSheet1();
-  else renderSheet2();
+  renderSheet1();
 });
 
 // Logs copy & clear

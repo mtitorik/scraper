@@ -120,7 +120,11 @@ class ProductRecord:
             "specifications": self.specifications[:120] + "..." if len(self.specifications) > 120 else self.specifications,
             "description_preview": self._plain_description_preview(160),
             "description_html_len": len(self.description_html or ""),
-            "variant_count": len(self.variant_combinations),
+            "attribute_options": {
+                cat: [e.to_dict() for e in entries]
+                for cat, entries in self.attribute_options.items()
+            },
+            "variant_count": sum(len(entries) for entries in self.attribute_options.values()) or len(self.variant_combinations),
             "sources": self.scraped_sources,
         }
 
