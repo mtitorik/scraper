@@ -152,13 +152,37 @@ class BrowserManager:
         self._active_page = await self._context.new_page()
         return self._active_page
 
+    TRACKER_DOMAINS = (
+        "googletagmanager.com",
+        "google-analytics.com",
+        "doubleclick.net",
+        "connect.facebook.net",
+        "facebook.com/tr",
+        "analytics.tiktok.com",
+        "static.hotjar.com",
+        "clarity.ms",
+        "embed.tawk.to",
+        "client.crisp.chat",
+        "widget.intercom.io",
+        "cdn.onesignal.com",
+    )
+
     async def _create_incognito_context(self) -> BrowserContext:
-        """Creates a fresh, isolated incognito context."""
+        """Creates a fresh, isolated incognito context with non-essential 3rd-party tracker blocking."""
         context = await self._browser.new_context(
             viewport={"width": 1366, "height": 860},
             ignore_https_errors=True,
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
         )
+        # Abort known 3rd-party analytics/chat pixels so pages settle much faster without touching site logic/images
+        async def _route_filter(route):
+            url_lower = route.request.url.lower()
+            if any(d in url_lower for d in self.TRACKER_DOMAINS):
+                await route.abort()
+            else:
+                await route.continue_()
+
+        await context.route("**/*", _route_filter)
         return context
 
     async def recycle_context(self) -> Page:

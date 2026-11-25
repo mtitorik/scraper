@@ -45,49 +45,81 @@ class SiteScraper:
 
     @classmethod
     def _build_fallback_queries(cls, product_name: str) -> List[str]:
-        """Generates cleaner fallback search queries for hyphenated SKUs like 'Joyroom JR-OE2S'."""
+        """Generates cleaner fallback search queries for hyphenated SKUs like 'Joyroom JR-OE2S'
+        and long 6+ word titles that strict store search engines fail to match verbatim.
+        """
         fallbacks: List[str] = []
-        # If there's a hyphenated model code like JR-OE2S, try:
-        # 1) Just the SKU ('JR-OE2S')
-        # 2) Without the prefix ('Joyroom OE2S')
+        IGNORE_HYPHEN = {"in-1", "2-in-1", "3-in-1", "4-in-1", "5-in-1", "type-c", "usb-c", "wi-fi", "in-ear", "on-ear", "over-ear", "built-in"}
+        # 1) Hyphenated model code like JR-OE2S -> try SKU ('JR-OE2S') and without prefix ('Joyroom OE2S')
         sku_match = re.search(r"\b([a-zA-Z]{1,4})-([a-zA-Z0-9]*\d[a-zA-Z0-9]*)\b", product_name)
-        if sku_match:
+        if sku_match and sku_match.group(0).lower() not in IGNORE_HYPHEN:
             full_sku = sku_match.group(0)
             suffix = sku_match.group(2)
             no_prefix = product_name.replace(full_sku, suffix).strip()
-            if full_sku.lower() != product_name.lower():
+            if len(full_sku) >= 4 and full_sku.lower() != product_name.lower():
                 fallbacks.append(full_sku)
             if no_prefix.lower() != product_name.lower() and no_prefix not in fallbacks:
                 fallbacks.append(no_prefix)
+
+        # 2) Long 6+ word title -> try clean first 4 words (strips marketing fluff & special pipes/dashes)
+        clean_words = [w for w in re.sub(r"[|•–—/()]+", " ", product_name).split() if len(w) > 1 or w.isdigit()]
+        if len(clean_words) >= 6:
+            short_q = " ".join(clean_words[:4])
+            if short_q.lower() != product_name.lower() and short_q not in fallbacks:
+                fallbacks.append(short_q)
         return fallbacks
 
     @classmethod
     async def _find_search_input(cls, page: Page):
-        for sel in cls.SEARCH_INPUT_SELECTORS:
+        """Fast single-eval visible search input finder (<10ms instead of 9x400ms sequential timeouts)."""
+        async def _probe_visible_input() -> Optional[str]:
             try:
-                loc = page.locator(sel).first
-                if await loc.is_visible(timeout=400):
-                    return loc
+                return await page.evaluate(r"""(selectors) => {
+                    for (const sel of selectors) {
+                        const els = document.querySelectorAll(sel);
+                        for (const el of els) {
+                            const r = el.getBoundingClientRect();
+                            if (r.width > 20 && r.height > 10 && window.getComputedStyle(el).visibility !== "hidden") {
+                                return sel;
+                            }
+                        }
+                    }
+                    return null;
+                }""", cls.SEARCH_INPUT_SELECTORS)
             except Exception:
-                continue
+                return None
 
-        for trig in cls.SEARCH_TRIGGER_SELECTORS:
-            try:
-                t_loc = page.locator(trig).first
-                if await t_loc.is_visible(timeout=300):
-                    await t_loc.click(timeout=800)
-                    await asyncio.sleep(0.4)
-                    break
-            except Exception:
-                continue
+        matched = await _probe_visible_input()
+        if matched:
+            return page.locator(matched).first
 
-        for sel in cls.SEARCH_INPUT_SELECTORS:
-            try:
-                loc = page.locator(sel).first
-                if await loc.is_visible(timeout=400):
-                    return loc
-            except Exception:
-                continue
+        # Try clicking a visible search trigger icon in one fast DOM probe
+        try:
+            trig_sel = await page.evaluate(r"""(triggers) => {
+                for (const sel of triggers) {
+                    const el = document.querySelector(sel);
+                    if (!el) continue;
+                    const r = el.getBoundingClientRect();
+                    if (r.width > 5 && r.height > 5 && window.getComputedStyle(el).visibility !== "hidden") {
+                        return sel;
+                    }
+                }
+                return null;
+            }""", cls.SEARCH_TRIGGER_SELECTORS)
+            if trig_sel:
+                await page.locator(trig_sel).first.click(timeout=800)
+                await asyncio.sleep(0.25)
+                matched = await _probe_visible_input()
+                if matched:
+                    return page.locator(matched).first
+        except Exception:
+            pass
+
+        # Cold-hydration safety retry (0ms overhead when search bar is already rendered!)
+        await asyncio.sleep(0.6)
+        matched = await _probe_visible_input()
+        if matched:
+            return page.locator(matched).first
 
         return None
 
@@ -152,15 +184,20 @@ class SiteScraper:
                 return false;
             };
 
+            const BADGE_ONLY_RE = /^(new|deal|new\s+deal|hot|sale|hot\s+deal|flash\s+sale|featured|best\s*seller|top\s*rated|limited|offer|discount|out\s+of\s+stock|in\s+stock|pre-?order|quick\s+view|view\s+all.*|add\s+to\s+cart|buy\s+now|shop\s+now|-\d+%|save\s+.*)$/i;
+            const byUrl = new Map();
+
             const addItem = (title, url) => {
                 if (!title || !url) return;
                 const cleanUrl = url.split("#")[0].trim();
                 const cleanTitle = title.replace(/\s+/g, " ").trim();
-                if (!cleanTitle || cleanTitle.length < 3) return;
+                if (!cleanTitle || cleanTitle.length < 3 || BADGE_ONLY_RE.test(cleanTitle)) return;
                 if (!cleanUrl.startsWith("http")) return;
-                if (seenUrls.has(cleanUrl)) return;
-                seenUrls.add(cleanUrl);
-                items.push({ title: cleanTitle, url: cleanUrl });
+                const prev = byUrl.get(cleanUrl);
+                // If multiple anchors point to the same product URL (e.g. badge/image link + title link), keep the richer title!
+                if (!prev || cleanTitle.length > prev.title.length) {
+                    byUrl.set(cleanUrl, { title: cleanTitle, url: cleanUrl });
+                }
             };
 
             // 1. Standard product cards & search dropdown items
@@ -205,7 +242,7 @@ class SiteScraper:
                 }
             });
 
-            return items;
+            return Array.from(byUrl.values());
         }""")
 
     @classmethod
@@ -276,36 +313,35 @@ class SiteScraper:
         await input_elem.click()
         await input_elem.fill("")
         await input_elem.fill(query)
-        await asyncio.sleep(0.8)  # Allow instant search dropdowns to populate
+        await asyncio.sleep(0.35)  # Allow instant search dropdowns to populate
 
         # Check live dropdown candidates BEFORE pressing Enter
         dropdown_items = await cls._collect_raw_candidates(page)
 
         await input_elem.press("Enter")
         try:
-            await page.wait_for_load_state("networkidle", timeout=3500)
+            await page.wait_for_load_state("networkidle", timeout=1800)
         except Exception:
-            await asyncio.sleep(1.2)
+            await asyncio.sleep(0.45)
 
         # Fallback: if pressing Enter didn't navigate (non-form React/SPA search bar), click search submit button
         if page.url.rstrip("/") == url_before:
-            for sub_sel in [
-                "button[type='submit']",
-                "button[aria-label*='search' i]",
-                ".search-submit",
-                ".search-btn",
-            ]:
-                try:
-                    btn = page.locator(sub_sel).first
-                    if await btn.is_visible(timeout=250):
-                        await btn.click(timeout=600)
-                        try:
-                            await page.wait_for_load_state("networkidle", timeout=2500)
-                        except Exception:
-                            await asyncio.sleep(0.8)
-                        break
-                except Exception:
-                    continue
+            try:
+                sub_sel = await page.evaluate(r"""() => {
+                    for (const sel of ["button[type='submit']", "button[aria-label*='search' i]", ".search-submit", ".search-btn"]) {
+                        const el = document.querySelector(sel);
+                        if (el && el.getBoundingClientRect().width > 5) return sel;
+                    }
+                    return null;
+                }""")
+                if sub_sel:
+                    await page.locator(sub_sel).first.click(timeout=600)
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=1600)
+                    except Exception:
+                        await asyncio.sleep(0.4)
+            except Exception:
+                pass
 
         await PopupGuard.dismiss_promotional_popups(page)
 
@@ -364,8 +400,18 @@ class SiteScraper:
         and returns top-ranked candidate link(s) matching product_name.
         """
         try:
-            await page.goto(site_url, wait_until="domcontentloaded", timeout=25000)
-            await asyncio.sleep(0.6)
+            # Fast-path: if already on the exact same site origin with a visible header search bar,
+            # skip redundant homepage reload (~2-4s saved per product!)
+            from urllib.parse import urlparse
+            same_origin = bool(page.url and urlparse(page.url).netloc.lower() == urlparse(site_url).netloc.lower())
+            need_home = True
+            if same_origin:
+                existing_input = await cls._find_search_input(page)
+                if existing_input is not None:
+                    need_home = False
+            if need_home:
+                await page.goto(site_url, wait_until="domcontentloaded", timeout=25000)
+                await asyncio.sleep(0.25)
             await PopupGuard.dismiss_promotional_popups(page)
 
             candidates = await cls._run_search_query(
@@ -377,6 +423,21 @@ class SiteScraper:
                 strict_model_matching=strict_model_matching,
                 custom_excludes=custom_excludes,
             )
+
+            # Safety fallback: if same-origin subpage search returned nothing, reload homepage once and retry
+            if not candidates and not need_home:
+                await page.goto(site_url, wait_until="domcontentloaded", timeout=25000)
+                await asyncio.sleep(0.25)
+                await PopupGuard.dismiss_promotional_popups(page)
+                candidates = await cls._run_search_query(
+                    page,
+                    product_name,
+                    product_name,
+                    skip_preowned=skip_preowned,
+                    skip_accessories=skip_accessories,
+                    strict_model_matching=strict_model_matching,
+                    custom_excludes=custom_excludes,
+                )
 
             # Fallback search if full query returned nothing (e.g., hyphenated SKU like 'Joyroom JR-OE2S')
             if not candidates and enable_fallback_sku_search:
@@ -439,18 +500,22 @@ class SiteScraper:
         }
 
         try:
-            await page.goto(page_url, wait_until="domcontentloaded", timeout=25000)
-            try:
-                await page.wait_for_load_state("networkidle", timeout=3500)
-            except Exception:
-                await asyncio.sleep(0.8)
+            # Fast-path: skip redundant double-goto if search already redirected straight to this product page!
+            cur_norm = (page.url or "").split("#")[0].rstrip("/")
+            target_norm = (page_url or "").split("#")[0].rstrip("/")
+            if cur_norm != target_norm:
+                await page.goto(page_url, wait_until="domcontentloaded", timeout=25000)
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=1800)
+                except Exception:
+                    await asyncio.sleep(0.35)
             await PopupGuard.dismiss_promotional_popups(page)
 
             # Scroll down gently to trigger lazy-loaded spec/description sections on Next.js/React pages
             await page.evaluate("window.scrollBy(0, 650)")
-            await asyncio.sleep(0.35)
+            await asyncio.sleep(0.18)
             await page.evaluate("window.scrollTo(0, 0)")
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(0.1)
 
             # 1. Product title (4-step fallback: h1 -> product-title/schema -> og:title -> document.title)
             result["raw_title"] = await cls._extract_page_title(page)
@@ -458,7 +523,6 @@ class SiteScraper:
             # 2. Run Variant Click-Loop FIRST while page is at top (or just extract default price if disabled)
             await PopupGuard.dismiss_promotional_popups(page)
             await page.evaluate("window.scrollTo(0, 0)")
-            await asyncio.sleep(0.2)
 
             if scrape_variants:
                 def_price, attr_options, combos, extra_imgs = await VariantExtractor.extract_all_variants_and_combos(
@@ -477,23 +541,26 @@ class SiteScraper:
             result["attribute_options"] = attr_options
             result["variant_combinations"] = combos
 
-            # 3. Click Specification tab if interactive
-            for tab_sel in [
-                "button:has-text('Specification')",
-                "a:has-text('Specification')",
-                "[role='tab']:has-text('Specification')",
-                "button:has-text('Specs')",
-                "a:has-text('Additional information')",
-                "[data-tab*='spec' i]",
-            ]:
-                try:
-                    spec_tab = page.locator(tab_sel).first
-                    if await spec_tab.is_visible(timeout=250):
-                        await spec_tab.click(timeout=600)
-                        await asyncio.sleep(0.35)
-                        break
-                except Exception:
-                    continue
+            # 3. Click Specification tab if interactive (single fast DOM probe instead of 6x250ms timeouts)
+            try:
+                spec_clicked = await page.evaluate(r"""() => {
+                    const els = Array.from(document.querySelectorAll("button, a, [role='tab'], [data-tab*='spec' i]"));
+                    for (const el of els) {
+                        if (el.closest("header, footer, nav")) continue;
+                        const r = el.getBoundingClientRect();
+                        if (r.width === 0 || r.height === 0) continue;
+                        const txt = (el.innerText || "").trim().toLowerCase();
+                        if (/^(specification|specifications|specs|additional information)$/.test(txt)) {
+                            el.click();
+                            return true;
+                        }
+                    }
+                    return false;
+                }""")
+                if spec_clicked:
+                    await asyncio.sleep(0.2)
+            except Exception:
+                pass
 
             # 3-Layer Universal Specifications Extractor
             specs_text = await page.evaluate(r"""() => {
@@ -617,23 +684,26 @@ class SiteScraper:
             if specs_text:
                 result["specifications"] = specs_text
 
-            # 3. Click Description tab if interactive
-            for tab_sel in [
-                "button:has-text('Description')",
-                "a:has-text('Description')",
-                "[role='tab']:has-text('Description')",
-                "button:has-text('Overview')",
-                "a:has-text('Overview')",
-                "[data-tab*='desc' i]",
-            ]:
-                try:
-                    desc_tab = page.locator(tab_sel).first
-                    if await desc_tab.is_visible(timeout=250):
-                        await desc_tab.click(timeout=600)
-                        await asyncio.sleep(0.35)
-                        break
-                except Exception:
-                    continue
+            # 3b. Click Description tab if interactive (single fast DOM probe instead of 6x250ms timeouts)
+            try:
+                desc_clicked = await page.evaluate(r"""() => {
+                    const els = Array.from(document.querySelectorAll("button, a, [role='tab'], [data-tab*='desc' i]"));
+                    for (const el of els) {
+                        if (el.closest("header, footer, nav")) continue;
+                        const r = el.getBoundingClientRect();
+                        if (r.width === 0 || r.height === 0) continue;
+                        const txt = (el.innerText || "").trim().toLowerCase();
+                        if (/^(descriptions?|overview)$/.test(txt)) {
+                            el.click();
+                            return true;
+                        }
+                    }
+                    return false;
+                }""")
+                if desc_clicked:
+                    await asyncio.sleep(0.2)
+            except Exception:
+                pass
 
             # 3-Layer Universal Description Extractor
             raw_desc = await page.evaluate(r"""() => {
@@ -644,7 +714,7 @@ class SiteScraper:
                     return (clone.innerText || "").replace(/\n{3,}/g, "\n\n").trim();
                 };
 
-                // Layer 1: Broad CSS selectors (OpenCart, WooCommerce, Shopify, Next.js/camelCase)
+                // Layer 1: Broad CSS selectors (OpenCart, WooCommerce, Shopify, Elementor, Next.js/camelCase)
                 const selectors = [
                     "#tab-description",
                     "#tabDescription",
@@ -653,6 +723,8 @@ class SiteScraper:
                     ".product-description",
                     ".product-detail-description",
                     ".product-overview",
+                    ".elementor-widget-theme-post-content",
+                    ".woocommerce-product-details__short-description",
                     "[data-section*='desc' i]",
                     "[id*='tabdesc' i]",
                     "[id*='description' i]",

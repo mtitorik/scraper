@@ -2,10 +2,12 @@ import os
 import re
 import io
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List, Tuple, Set, Optional
 
 import requests
+from requests.adapters import HTTPAdapter
 from PIL import Image
 
 
@@ -31,6 +33,22 @@ class ImageDownloader:
     def __init__(self, root_folder: str):
         self.root_folder = Path(root_folder).resolve()
         self.root_folder.mkdir(parents=True, exist_ok=True)
+        # Persistent connection-pooled session reused across products
+        self._session = requests.Session()
+        adapter = HTTPAdapter(pool_connections=8, pool_maxsize=12)
+        self._session.mount("http://", adapter)
+        self._session.mount("https://", adapter)
+
+    def _fetch_one(self, req_session: requests.Session, url: str) -> Optional[bytes]:
+        if not url or not url.startswith("http"):
+            return None
+        try:
+            resp = req_session.get(url, headers=self.HEADERS, timeout=15)
+            if resp.status_code == 200 and resp.content:
+                return resp.content
+        except Exception as e:
+            print(f"[ImageDownloader] Warning downloading {url}: {e}")
+        return None
 
     def download_product_images(
         self,
@@ -38,14 +56,15 @@ class ImageDownloader:
         image_urls: List[str],
         session: Optional[requests.Session] = None,
     ) -> Tuple[str, List[str]]:
-        """Downloads all unique images into [root_folder]/[product_name]/
+        """Downloads all unique images into [root_folder]/[product_name]/ concurrently
+        while preserving exact gallery order, SHA-256 deduplication, and max-quality JPEG conversion.
         Returns (folder_path, list_of_saved_jpeg_paths).
         """
         clean_name = sanitize_filename(product_name)
         product_dir = self.root_folder / clean_name
         product_dir.mkdir(parents=True, exist_ok=True)
 
-        req_session = session or requests.Session()
+        req_session = session or self._session
         saved_paths: List[str] = []
         seen_hashes: Set[str] = set()
 
@@ -59,17 +78,22 @@ class ImageDownloader:
                 pass
 
         saved_count = len(saved_paths)
+        valid_urls = [u for u in image_urls if u and u.startswith("http")]
+        if not valid_urls:
+            return str(product_dir), saved_paths
 
-        for url in image_urls:
-            if not url or not url.startswith("http"):
+        # Fetch concurrently (max 4 workers) while preserving exact gallery order
+        if len(valid_urls) > 1 and session is None:
+            with ThreadPoolExecutor(max_workers=min(4, len(valid_urls))) as pool:
+                raw_results = list(pool.map(lambda u: self._fetch_one(req_session, u), valid_urls))
+        else:
+            raw_results = [self._fetch_one(req_session, u) for u in valid_urls]
+
+        for url, raw_bytes in zip(valid_urls, raw_results):
+            if not raw_bytes:
                 continue
 
             try:
-                resp = req_session.get(url, headers=self.HEADERS, timeout=15)
-                if resp.status_code != 200 or not resp.content:
-                    continue
-
-                raw_bytes = resp.content
                 img_hash = hashlib.sha256(raw_bytes).hexdigest()
 
                 # Deduplication check
@@ -87,9 +111,8 @@ class ImageDownloader:
                     # Handle transparency: RGBA, LA, or P with transparency
                     if pil_img.mode in ("RGBA", "LA") or (pil_img.mode == "P" and "transparency" in pil_img.info):
                         rgba_img = pil_img.convert("RGBA")
-                        # Create white background image of exact same dimensions
                         bg = Image.new("RGB", rgba_img.size, (255, 255, 255))
-                        bg.paste(rgba_img, mask=rgba_img.split()[3])  # 3 is the alpha channel
+                        bg.paste(rgba_img, mask=rgba_img.split()[3])
                         final_img = bg
                     else:
                         final_img = pil_img.convert("RGB")
@@ -108,7 +131,7 @@ class ImageDownloader:
                     saved_paths.append(str(target_file))
 
             except Exception as e:
-                print(f"[ImageDownloader] Warning downloading {url}: {e}")
+                print(f"[ImageDownloader] Warning processing {url}: {e}")
                 continue
 
         return str(product_dir), saved_paths
