@@ -31,6 +31,8 @@ const playAlertChime = () => {
 
 // DOM Elements
 const elements = {
+  sidebar: document.getElementById("sidebar"),
+  btnToggleSidebar: document.getElementById("btn-toggle-sidebar"),
   sidebarBrandSubtitle: document.getElementById("sidebar-brand-subtitle"),
   navResultsCount: document.getElementById("nav-results-count"),
   navWebsitesCount: document.getElementById("nav-websites-count"),
@@ -99,12 +101,18 @@ const elements = {
   tableSearch: document.getElementById("table-search"),
   tableRowCount: document.getElementById("table-row-count"),
 
-  // Websites
+  // Websites & Matching/Filtering Rules
   websiteList: document.getElementById("website-list"),
   newWebsiteUrl: document.getElementById("new-website-url"),
   btnAddWebsite: document.getElementById("btn-add-website"),
   chkMissingOfficialPair: document.getElementById("chk-missing-official-pair"),
   chkSkipPreowned: document.getElementById("chk-skip-preowned"),
+  chkSkipAccessories: document.getElementById("chk-skip-accessories"),
+  chkStrictModel: document.getElementById("chk-strict-model"),
+  chkFallbackSku: document.getElementById("chk-fallback-sku"),
+  chkScrapeVariants: document.getElementById("chk-scrape-variants"),
+  chkDownloadImages: document.getElementById("chk-download-images"),
+  txtCustomExcludes: document.getElementById("txt-custom-excludes"),
 
   // Browser & Resources
   badgeChrome: document.getElementById("badge-chrome"),
@@ -388,7 +396,20 @@ document.querySelectorAll(".kpi-card.clickable").forEach((card) => {
   });
 });
 
-// Keyboard Shortcuts (Esc, Cmd/Ctrl+1..6, Cmd/Ctrl+K)
+// Collapsible Sidebar
+const setSidebarCollapsed = (collapsed, persist = true) => {
+  elements.sidebar.classList.toggle("collapsed", Boolean(collapsed));
+  if (persist) {
+    appSettings.sidebar_collapsed = Boolean(collapsed);
+    callApi("save_settings", appSettings);
+  }
+};
+
+elements.btnToggleSidebar.addEventListener("click", () => {
+  setSidebarCollapsed(!elements.sidebar.classList.contains("collapsed"), true);
+});
+
+// Keyboard Shortcuts (Esc, Cmd/Ctrl+1..6, Cmd/Ctrl+K, Cmd/Ctrl+B)
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !elements.productDrawer.classList.contains("hidden")) {
     closeProductDrawer();
@@ -404,6 +425,9 @@ window.addEventListener("keydown", (e) => {
       e.preventDefault();
       switchTab("tab-results");
       elements.tableSearch.focus();
+    } else if (e.key.toLowerCase() === "b") {
+      e.preventDefault();
+      setSidebarCollapsed(!elements.sidebar.classList.contains("collapsed"), true);
     }
   }
 });
@@ -1130,6 +1154,13 @@ const saveCurrentSettings = () => {
   appSettings.custom_browser_path = elements.customBrowserPath.value;
   appSettings.search_missing_official_unofficial_pair = elements.chkMissingOfficialPair.checked;
   appSettings.skip_preowned_devices = elements.chkSkipPreowned.checked;
+  appSettings.skip_accessories = elements.chkSkipAccessories.checked;
+  appSettings.strict_model_matching = elements.chkStrictModel.checked;
+  appSettings.enable_fallback_sku_search = elements.chkFallbackSku.checked;
+  appSettings.scrape_variants = elements.chkScrapeVariants.checked;
+  appSettings.download_images = elements.chkDownloadImages.checked;
+  appSettings.custom_exclude_keywords = elements.txtCustomExcludes.value;
+  appSettings.sidebar_collapsed = elements.sidebar.classList.contains("collapsed");
   appSettings.enable_gemini = elements.chkEnableGemini.checked;
   appSettings.gemini_api_key = elements.geminiApiKey.value;
   appSettings.gemini_model = elements.selGeminiModel.value;
@@ -1150,6 +1181,12 @@ const saveCurrentSettings = () => {
   elements.customBrowserPath,
   elements.chkMissingOfficialPair,
   elements.chkSkipPreowned,
+  elements.chkSkipAccessories,
+  elements.chkStrictModel,
+  elements.chkFallbackSku,
+  elements.chkScrapeVariants,
+  elements.chkDownloadImages,
+  elements.txtCustomExcludes,
   elements.geminiApiKey,
   elements.selGeminiModel,
   elements.txtCustomStructure,
@@ -1186,6 +1223,13 @@ const loadSettingsIntoUI = (s) => {
 
   elements.chkMissingOfficialPair.checked = s.search_missing_official_unofficial_pair ?? true;
   elements.chkSkipPreowned.checked = s.skip_preowned_devices ?? true;
+  elements.chkSkipAccessories.checked = s.skip_accessories ?? true;
+  elements.chkStrictModel.checked = s.strict_model_matching ?? true;
+  elements.chkFallbackSku.checked = s.enable_fallback_sku_search ?? true;
+  elements.chkScrapeVariants.checked = s.scrape_variants ?? true;
+  elements.chkDownloadImages.checked = s.download_images ?? true;
+  elements.txtCustomExcludes.value = s.custom_exclude_keywords || "";
+  setSidebarCollapsed(Boolean(s.sidebar_collapsed), false);
 
   elements.chkEnableGemini.checked = s.enable_gemini ?? true;
   elements.geminiSettingsContainer.style.opacity = elements.chkEnableGemini.checked ? "1" : "0.5";

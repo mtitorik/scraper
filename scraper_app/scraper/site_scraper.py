@@ -209,11 +209,21 @@ class SiteScraper:
         }""")
 
     @classmethod
+    def _has_custom_exclude(cls, title: str, custom_excludes: Optional[List[str]]) -> bool:
+        if not custom_excludes:
+            return False
+        t_lower = title.lower()
+        return any(kw in t_lower for kw in custom_excludes if kw)
+
+    @classmethod
     def _filter_and_rank_candidates(
         cls,
         raw_items: List[Dict[str, str]],
         product_name: str,
         skip_preowned: bool,
+        skip_accessories: bool = True,
+        strict_model_matching: bool = True,
+        custom_excludes: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         candidates: List[Dict[str, Any]] = []
         for item in raw_items:
@@ -222,13 +232,16 @@ class SiteScraper:
             if not title or not url or url.startswith("javascript:"):
                 continue
 
-            if is_accessory(title, product_name):
+            if cls._has_custom_exclude(title, custom_excludes):
+                continue
+
+            if skip_accessories and is_accessory(title, product_name):
                 continue
 
             if skip_preowned and is_preowned_or_used(title, product_name):
                 continue
 
-            if not matches_model_name(title, product_name):
+            if strict_model_matching and not matches_model_name(title, product_name):
                 continue
 
             off_type = classify_official_unofficial(title)
@@ -250,6 +263,9 @@ class SiteScraper:
         query: str,
         target_product_name: str,
         skip_preowned: bool,
+        skip_accessories: bool = True,
+        strict_model_matching: bool = True,
+        custom_excludes: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         input_elem = await cls._find_search_input(page)
         if not input_elem:
@@ -294,16 +310,16 @@ class SiteScraper:
         await PopupGuard.dismiss_promotional_popups(page)
 
         # Direct Product Page Redirect Check (e.g. WooCommerce single-match redirect!)
-        # Works even without '/product/' in URL and without <h1> via 4-step title resolver.
         current_url = page.url.rstrip("/")
         is_search_results_url = bool(re.search(r"([?&](s|q|search|keyword)=|/search\b)", current_url, re.IGNORECASE))
         if current_url != url_before and not is_search_results_url:
             direct_title = await cls._extract_page_title(page)
             if (
                 direct_title
-                and not is_accessory(direct_title, target_product_name)
+                and not cls._has_custom_exclude(direct_title, custom_excludes)
+                and not (skip_accessories and is_accessory(direct_title, target_product_name))
                 and not (skip_preowned and is_preowned_or_used(direct_title, target_product_name))
-                and matches_model_name(direct_title, target_product_name)
+                and (not strict_model_matching or matches_model_name(direct_title, target_product_name))
             ):
                 return [{
                     "title": direct_title,
@@ -323,7 +339,14 @@ class SiteScraper:
                 seen.add(u)
                 merged.append(it)
 
-        return cls._filter_and_rank_candidates(merged, target_product_name, skip_preowned)
+        return cls._filter_and_rank_candidates(
+            merged,
+            target_product_name,
+            skip_preowned=skip_preowned,
+            skip_accessories=skip_accessories,
+            strict_model_matching=strict_model_matching,
+            custom_excludes=custom_excludes,
+        )
 
     @classmethod
     async def search_product(
@@ -332,8 +355,12 @@ class SiteScraper:
         site_url: str,
         product_name: str,
         skip_preowned: bool = True,
+        skip_accessories: bool = True,
+        strict_model_matching: bool = True,
+        enable_fallback_sku_search: bool = True,
+        custom_excludes: Optional[List[str]] = None,
     ) -> List[Dict[str, str]]:
-        """Navigates to site_url, performs search (with smart SKU fallback if needed),
+        """Navigates to site_url, performs search (with optional smart SKU fallback),
         and returns top-ranked candidate link(s) matching product_name.
         """
         try:
@@ -341,13 +368,29 @@ class SiteScraper:
             await asyncio.sleep(0.6)
             await PopupGuard.dismiss_promotional_popups(page)
 
-            candidates = await cls._run_search_query(page, product_name, product_name, skip_preowned)
+            candidates = await cls._run_search_query(
+                page,
+                product_name,
+                product_name,
+                skip_preowned=skip_preowned,
+                skip_accessories=skip_accessories,
+                strict_model_matching=strict_model_matching,
+                custom_excludes=custom_excludes,
+            )
 
             # Fallback search if full query returned nothing (e.g., hyphenated SKU like 'Joyroom JR-OE2S')
-            if not candidates:
+            if not candidates and enable_fallback_sku_search:
                 for fb_query in cls._build_fallback_queries(product_name):
                     print(f"[SiteScraper] Retrying search on {site_url} with fallback query: '{fb_query}'")
-                    candidates = await cls._run_search_query(page, fb_query, product_name, skip_preowned)
+                    candidates = await cls._run_search_query(
+                        page,
+                        fb_query,
+                        product_name,
+                        skip_preowned=skip_preowned,
+                        skip_accessories=skip_accessories,
+                        strict_model_matching=strict_model_matching,
+                        custom_excludes=custom_excludes,
+                    )
                     if candidates:
                         break
 
@@ -378,6 +421,7 @@ class SiteScraper:
         pause_event: Optional[asyncio.Event] = None,
         stop_event: Optional[asyncio.Event] = None,
         throttle_callback: Optional[Any] = None,
+        scrape_variants: bool = True,
     ) -> Dict[str, Any]:
         """Scrapes full specifications, raw description, warranty, images,
         and variant clicks from a single product page using a 3-layer universal extractor.
@@ -411,20 +455,24 @@ class SiteScraper:
             # 1. Product title (4-step fallback: h1 -> product-title/schema -> og:title -> document.title)
             result["raw_title"] = await cls._extract_page_title(page)
 
-            # 2. Run Variant Click-Loop FIRST while page is at top (zero sticky-header interference!)
+            # 2. Run Variant Click-Loop FIRST while page is at top (or just extract default price if disabled)
             await PopupGuard.dismiss_promotional_popups(page)
             await page.evaluate("window.scrollTo(0, 0)")
             await asyncio.sleep(0.2)
 
-            def_price, attr_options, combos, extra_imgs = await VariantExtractor.extract_all_variants_and_combos(
-                page=page,
-                product_name=target_product_name,
-                source_website=source_website,
-                page_link=page_url,
-                pause_event=pause_event,
-                stop_event=stop_event,
-                throttle_callback=throttle_callback,
-            )
+            if scrape_variants:
+                def_price, attr_options, combos, extra_imgs = await VariantExtractor.extract_all_variants_and_combos(
+                    page=page,
+                    product_name=target_product_name,
+                    source_website=source_website,
+                    page_link=page_url,
+                    pause_event=pause_event,
+                    stop_event=stop_event,
+                    throttle_callback=throttle_callback,
+                )
+            else:
+                def_price = await VariantExtractor.extract_page_prices(page)
+                attr_options, combos, extra_imgs = {}, [], set()
             result["default_price"] = def_price
             result["attribute_options"] = attr_options
             result["variant_combinations"] = combos

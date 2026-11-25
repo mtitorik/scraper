@@ -105,7 +105,7 @@ class ScraperOrchestrator:
         """Determines if a product has all essential information so further websites can be skipped."""
         has_price = record.default_price.regular is not None and record.default_price.regular > 0
         has_specs = bool(record.specifications and record.specifications != "not found")
-        has_images = bool(record.image_folder and os.path.exists(record.image_folder))
+        has_images = (not self.settings.download_images) or bool(record.image_folder and os.path.exists(record.image_folder))
 
         if not (has_price and has_specs and has_images):
             return False
@@ -234,11 +234,21 @@ class ScraperOrchestrator:
                     })
                     self.on_log(f"[Pass {site_idx} • {pass_idx}/{len(pending_for_pass)}] Searching '{record.product_name}' on {site_url}...")
 
+                    custom_excludes = [
+                        k.strip().lower()
+                        for k in (self.settings.custom_exclude_keywords or "").split(",")
+                        if k.strip()
+                    ]
+
                     candidates = await SiteScraper.search_product(
                         page=page,
                         site_url=site_url,
                         product_name=record.product_name,
                         skip_preowned=self.settings.skip_preowned_devices,
+                        skip_accessories=self.settings.skip_accessories,
+                        strict_model_matching=self.settings.strict_model_matching,
+                        enable_fallback_sku_search=self.settings.enable_fallback_sku_search,
+                        custom_excludes=custom_excludes,
                     )
 
                     if await PopupGuard.detect_human_verification(page):
@@ -271,6 +281,7 @@ class ScraperOrchestrator:
                             pause_event=self.pause_event,
                             stop_event=self.stop_event,
                             throttle_callback=self.resource_guard.throttle_if_needed,
+                            scrape_variants=self.settings.scrape_variants,
                         )
 
                         # Merge prices
@@ -301,8 +312,8 @@ class ScraperOrchestrator:
                         if page_data["warranty"] and "Warranty" not in record.extra_fields:
                             record.extra_fields["Warranty"] = page_data["warranty"]
 
-                        # Download and convert images
-                        if page_data["image_urls"]:
+                        # Download and convert images (when enabled in Matching & Filtering Rules)
+                        if self.settings.download_images and page_data["image_urls"]:
                             folder, saved_imgs = self.image_downloader.download_product_images(
                                 product_name=record.product_name,
                                 image_urls=page_data["image_urls"],

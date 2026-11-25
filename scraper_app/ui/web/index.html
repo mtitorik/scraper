@@ -9,7 +9,7 @@
 <body>
   <div class="app-layout">
     <!-- Sidebar Navigation -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="brand-header">
         <div class="brand-logo" aria-hidden="true">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -22,6 +22,9 @@
           <div class="brand-title">Scraper</div>
           <div class="brand-subtitle" id="sidebar-brand-subtitle">Catalog Intelligence</div>
         </div>
+        <button class="sidebar-collapse-btn" id="btn-toggle-sidebar" type="button" title="Collapse / Expand Sidebar (Cmd/Ctrl+B)" aria-label="Toggle sidebar">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
       </div>
 
       <nav class="nav-menu" aria-label="Main navigation">
@@ -361,6 +364,60 @@
                 <input type="checkbox" id="chk-skip-preowned" checked>
                 <span class="slider round"></span>
               </label>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-row-info">
+                <strong>Filter out unrelated accessories for main devices</strong>
+                <span>Ignores cases, covers, protectors, and cables when searching phones, earbuds, watches, or laptops (still allows direct accessory searches like Baseus cables).</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="chk-skip-accessories" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-row-info">
+                <strong>Strict model &amp; generation matching</strong>
+                <span>Prevents wrong generation matches (e.g. AirPods Pro 2 vs 3, iPhone 16 vs 16 Pro Max). Turn off for looser matching on stores with unusual titles.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="chk-strict-model" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-row-info">
+                <strong>Retry search with simplified SKU / model code</strong>
+                <span>If a full query like &ldquo;Joyroom JR-OE2S&rdquo; returns no matches, automatically retries with &ldquo;JR-OE2S&rdquo; or &ldquo;Joyroom OE2S&rdquo;.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="chk-fallback-sku" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-row-info">
+                <strong>Click through &amp; capture all product variants</strong>
+                <span>Clicks Size, Colour, Storage, Region, and Official/Unofficial options (including out-of-stock). Turn off for faster default-price-only runs.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="chk-scrape-variants" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-row-info">
+                <strong>Download Hero Product Gallery images</strong>
+                <span>Downloads deduplicated max-quality .jpg photos strictly from the product gallery. Turn off for lightning-fast price &amp; specs-only runs.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="chk-download-images" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
+            <div class="form-group" style="margin-top: 6px; margin-bottom: 0;">
+              <label for="txt-custom-excludes">Custom Exclude Keywords <small>(Comma-separated — listings containing any of these words are skipped)</small></label>
+              <input type="text" id="txt-custom-excludes" placeholder="e.g. replica, master copy, box only, dummy">
             </div>
           </div>
         </div>

@@ -47,9 +47,19 @@ class AppSettings:
     max_cpu_percent: int = 40
     max_ram_gb: float = 2.0
     
-    # Scraping behavior
+    # Scraping behavior (Matching & Filtering Rules)
     search_missing_official_unofficial_pair: bool = True  # Option C
     skip_preowned_devices: bool = True
+    skip_accessories: bool = True
+    strict_model_matching: bool = True
+    enable_fallback_sku_search: bool = True
+    scrape_variants: bool = True
+    download_images: bool = True
+    custom_exclude_keywords: str = ""
+
+    # UI preferences
+    theme: str = "dark"  # "dark" or "light"
+    sidebar_collapsed: bool = False
     
     # Gemini AI configuration
     enable_gemini: bool = True
@@ -64,9 +74,6 @@ class AppSettings:
     store_address: str = ""
     selling_points: str = ""
     custom_rules: str = ""
-    
-    # UI preferences
-    theme: str = "dark"  # "dark" or "light"
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
