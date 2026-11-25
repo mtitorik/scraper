@@ -92,13 +92,65 @@ class SiteScraper:
         return None
 
     @classmethod
+    async def _extract_page_title(cls, page: Page) -> str:
+        """4-step universal product title resolver:
+        1. <h1>
+        2. Common product-title selectors / schema ([itemprop='name'], .product_title, .product-title)
+        3. OpenGraph meta tag (<meta property='og:title'>)
+        4. document.title (stripping trailing ' - Store' / ' | Store' suffixes)
+        """
+        try:
+            title = await page.evaluate(r"""() => {
+                const pick = (sel) => {
+                    const el = document.querySelector(sel);
+                    return el && el.innerText ? el.innerText.trim() : "";
+                };
+                // 1. Standard h1
+                const h1 = pick("h1");
+                if (h1 && h1.length >= 3) return h1;
+
+                // 2. Common product-title classes & schema markup
+                for (const sel of [
+                    "[itemprop='name']",
+                    ".product_title",
+                    ".product-title",
+                    ".product-detail-name",
+                    ".product-name",
+                    "main h2"
+                ]) {
+                    const t = pick(sel);
+                    if (t && t.length >= 3) return t;
+                }
+
+                // 3. OpenGraph meta tag
+                const og = document.querySelector("meta[property='og:title'], meta[name='og:title']");
+                if (og && og.content && og.content.trim().length >= 3) {
+                    return og.content.trim().replace(/\s*[\-|–|—|\|]\s*[^\-|–|—|\|]+$/, "").trim();
+                }
+
+                // 4. Browser tab title
+                return (document.title || "").replace(/\s*[\-|–|—|\|]\s*[^\-|–|—|\|]+$/, "").trim();
+            }""")
+            return (title or "").strip()
+        except Exception:
+            return ""
+
+    @classmethod
     async def _collect_raw_candidates(cls, page: Page) -> List[Dict[str, str]]:
         """Collects candidate product links from BOTH product cards AND product-like links
-        (including live search dropdowns and Tailwind/Next.js grids without .card classes).
+        (including live search dropdowns and Tailwind/Next.js grids), ignoring skip-links & nav/footer noise.
         """
         return await page.evaluate(r"""() => {
             const items = [];
             const seenUrls = new Set();
+
+            const isInvalidHref = (a) => {
+                const rawHref = (a.getAttribute("href") || "").trim();
+                if (!rawHref || rawHref.startsWith("#") || rawHref.startsWith("javascript:") || rawHref.startsWith("mailto:") || rawHref.startsWith("tel:")) {
+                    return true;
+                }
+                return false;
+            };
 
             const addItem = (title, url) => {
                 if (!title || !url) return;
@@ -113,17 +165,19 @@ class SiteScraper:
 
             // 1. Standard product cards & search dropdown items
             const cards = document.querySelectorAll(
-                ".product-thumb, .product-card, .product-layout, .search-result-item, .product-item, .search-dropdown a, [class*='search-result' i] a, [class*='product' i] a"
+                ".product-thumb, .product-card, .product-layout, .search-result-item, .product-item, .search-dropdown a, [class*='search-result' i] a, [class*='autocomplete' i] a, [class*='product' i] a"
             );
             cards.forEach(card => {
+                if (card.closest("footer")) return;
                 if (card.tagName === "A") {
+                    if (isInvalidHref(card)) return;
                     const titleEl = card.querySelector("h2, h3, h4, h5, p, span, .title, .name");
                     const title = (titleEl ? titleEl.innerText : card.innerText) || card.getAttribute("title") || "";
                     addItem(title, card.href);
                 } else {
                     const linkEl = card.querySelector("a[href*='product'], h2 a, h3 a, h4 a, .title a, a.product-title, a[href]");
                     const titleEl = card.querySelector("h2, h3, h4, h5, .title, .product-title, .name, p");
-                    if (linkEl && linkEl.href) {
+                    if (linkEl && !isInvalidHref(linkEl) && linkEl.href) {
                         const title = (titleEl ? titleEl.innerText : linkEl.innerText) || linkEl.getAttribute("title") || "";
                         addItem(title, linkEl.href);
                     }
@@ -133,16 +187,18 @@ class SiteScraper:
             // 2. Always also scan all product-like links (handles Tailwind/Next.js div grids!)
             const allLinks = Array.from(document.querySelectorAll("a[href]"));
             allLinks.forEach(a => {
+                if (isInvalidHref(a)) return;
+                if (a.closest("footer, nav") && !a.closest("[class*='search' i], [class*='dropdown' i], [class*='autocomplete' i]")) {
+                    return;
+                }
                 const href = a.href || "";
                 const hrefLower = href.toLowerCase();
-                // Skip obvious non-product navigation links
-                if (/\/(cart|checkout|login|register|account|wishlist|compare|blog|news|contact|about|privacy|terms|category|categories|brand|brands)\b/.test(hrefLower)) {
+                if (/\/(cart|checkout|login|register|account|wishlist|compare|blog|news|contact|about|privacy|terms|category|categories|product-category|brand|brands)\b/.test(hrefLower)) {
                     return;
                 }
                 const isProductUrl = /\/(product|products|item|p|shop|gadget|gadgets)\//i.test(hrefLower);
                 const heading = a.querySelector("h2, h3, h4, h5, p, .title, .name");
                 const rawText = (heading ? heading.innerText : a.innerText) || a.getAttribute("title") || "";
-                // Clean out trailing price lines from multi-line card links
                 const firstLine = rawText.split("\n").map(s => s.trim()).filter(s => s && !/^(৳|bdt|tk|\$|out of stock|in stock|add to cart|buy now|save|\-\d+%)/i.test(s))[0] || "";
                 if (firstLine.length >= 4 && (isProductUrl || /\d/.test(firstLine))) {
                     addItem(firstLine, href);
@@ -199,20 +255,62 @@ class SiteScraper:
         if not input_elem:
             return []
 
+        url_before = page.url.rstrip("/")
+
         await input_elem.click()
         await input_elem.fill("")
         await input_elem.fill(query)
         await asyncio.sleep(0.8)  # Allow instant search dropdowns to populate
 
-        # Check live dropdown candidates BEFORE pressing Enter as well
+        # Check live dropdown candidates BEFORE pressing Enter
         dropdown_items = await cls._collect_raw_candidates(page)
 
         await input_elem.press("Enter")
         try:
             await page.wait_for_load_state("networkidle", timeout=3500)
         except Exception:
-            await asyncio.sleep(1.5)
+            await asyncio.sleep(1.2)
+
+        # Fallback: if pressing Enter didn't navigate (non-form React/SPA search bar), click search submit button
+        if page.url.rstrip("/") == url_before:
+            for sub_sel in [
+                "button[type='submit']",
+                "button[aria-label*='search' i]",
+                ".search-submit",
+                ".search-btn",
+            ]:
+                try:
+                    btn = page.locator(sub_sel).first
+                    if await btn.is_visible(timeout=250):
+                        await btn.click(timeout=600)
+                        try:
+                            await page.wait_for_load_state("networkidle", timeout=2500)
+                        except Exception:
+                            await asyncio.sleep(0.8)
+                        break
+                except Exception:
+                    continue
+
         await PopupGuard.dismiss_promotional_popups(page)
+
+        # Direct Product Page Redirect Check (e.g. WooCommerce single-match redirect!)
+        # Works even without '/product/' in URL and without <h1> via 4-step title resolver.
+        current_url = page.url.rstrip("/")
+        is_search_results_url = bool(re.search(r"([?&](s|q|search|keyword)=|/search\b)", current_url, re.IGNORECASE))
+        if current_url != url_before and not is_search_results_url:
+            direct_title = await cls._extract_page_title(page)
+            if (
+                direct_title
+                and not is_accessory(direct_title, target_product_name)
+                and not (skip_preowned and is_preowned_or_used(direct_title, target_product_name))
+                and matches_model_name(direct_title, target_product_name)
+            ):
+                return [{
+                    "title": direct_title,
+                    "url": page.url.split("#")[0],
+                    "official_type": classify_official_unofficial(direct_title),
+                    "score": score_candidate(direct_title, target_product_name) + 50.0,
+                }]
 
         page_items = await cls._collect_raw_candidates(page)
 
@@ -310,12 +408,8 @@ class SiteScraper:
             await page.evaluate("window.scrollTo(0, 0)")
             await asyncio.sleep(0.2)
 
-            # 1. Product title
-            raw_title = await page.evaluate(r"""() => {
-                const h1 = document.querySelector("h1, .product-title, .product-detail-name");
-                return h1 ? h1.innerText.trim() : document.title;
-            }""")
-            result["raw_title"] = raw_title
+            # 1. Product title (4-step fallback: h1 -> product-title/schema -> og:title -> document.title)
+            result["raw_title"] = await cls._extract_page_title(page)
 
             # 2. Click Specification tab if interactive
             for tab_sel in [
@@ -548,16 +642,37 @@ class SiteScraper:
             }""")
             result["warranty"] = warranty_text
 
-            # 5. Extract initial high-resolution gallery images
+            # 5. Extract initial high-resolution gallery images (supports data-large_image, zoom, srcset, data-src)
             gallery_images = await page.evaluate(r"""() => {
                 const imgs = [];
+                const pickBestSrcset = (srcset) => {
+                    if (!srcset) return "";
+                    let bestUrl = "";
+                    let bestWidth = 0;
+                    srcset.split(",").forEach(entry => {
+                        const parts = entry.trim().split(/\s+/);
+                        const u = parts[0];
+                        const w = parts[1] ? parseInt(parts[1].replace(/\D/g, ""), 10) : 0;
+                        if (u && u.startsWith("http") && w >= bestWidth) {
+                            bestWidth = w;
+                            bestUrl = u;
+                        }
+                    });
+                    return bestUrl;
+                };
+
                 const imgEls = document.querySelectorAll(
-                    ".product-gallery img, .product-image img, .slider-thumb img, [data-zoom-image], .gallery-item img, main img"
+                    ".product-gallery img, .woocommerce-product-gallery img, .product-image img, .slider-thumb img, [data-zoom-image], [data-large_image], .gallery-item img, main img"
                 );
                 imgEls.forEach(img => {
                     if (img.closest("header, footer, nav")) return;
-                    const src = img.getAttribute("data-zoom-image") || img.getAttribute("data-src") || img.src;
-                    if (src && src.startsWith("http") && !/icon|logo|badge|payment|flag/i.test(src) && !src.endsWith(".svg")) {
+                    const src =
+                        img.getAttribute("data-large_image") ||
+                        img.getAttribute("data-zoom-image") ||
+                        pickBestSrcset(img.getAttribute("srcset")) ||
+                        img.getAttribute("data-src") ||
+                        img.src || "";
+                    if (src && src.startsWith("http") && !src.startsWith("data:") && !/icon|logo|badge|payment|flag/i.test(src) && !src.endsWith(".svg")) {
                         if ((img.naturalWidth === 0 || img.naturalWidth >= 150) && !imgs.includes(src)) {
                             imgs.push(src);
                         }

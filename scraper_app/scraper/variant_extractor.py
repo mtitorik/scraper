@@ -28,32 +28,45 @@ class VariantExtractor:
 
     @classmethod
     async def extract_page_prices(cls, page: Page) -> PricePair:
-        """Extracts current Regular and Discounted prices from active page DOM."""
+        """Extracts current Regular and Discounted prices from active page DOM,
+        ignoring EMI/monthly installments, 'Save X' badges, and booking amounts.
+        """
         try:
             prices_info = await page.evaluate(r"""() => {
                 let reg = null;
                 let disc = null;
 
-                // Look for common e-commerce price patterns
-                const delElem = document.querySelector("del, .price-old, .old-price, .line-through, .original-price");
-                const saleElem = document.querySelector(".special-price, .price-new, .sale-price, .discount-price, .current-price");
+                const isNoisePrice = (el) => {
+                    if (!el) return true;
+                    if (el.closest("header, footer, nav, .related, .upsells, [class*='related' i]")) return true;
+                    const ctxText = ((el.parentElement ? el.parentElement.innerText : "") + " " + el.innerText).toLowerCase();
+                    return /\b(emi|\/mo|\/month|per month|installment|booking|advance|save\s+[৳$]|off)\b/.test(ctxText);
+                };
+
+                const findValid = (selector) => {
+                    const els = Array.from(document.querySelectorAll(selector));
+                    for (const el of els) {
+                        const txt = (el.innerText || "").trim();
+                        if (txt && /\d/.test(txt) && !isNoisePrice(el)) {
+                            return el;
+                        }
+                    }
+                    return null;
+                };
+
+                const delElem = findValid("del, .price-old, .old-price, .line-through, .original-price");
+                const saleElem = findValid("ins, .special-price, .price-new, .sale-price, .discount-price, .current-price");
 
                 if (delElem && saleElem) {
                     reg = delElem.innerText;
                     disc = saleElem.innerText;
                 } else if (delElem) {
                     reg = delElem.innerText;
-                    const pElem = document.querySelector(".price, .product-price");
+                    const pElem = findValid(".price, .product-price");
                     if (pElem && pElem !== delElem) disc = pElem.innerText;
                 } else {
-                    const priceElems = Array.from(document.querySelectorAll(".price, .product-price, .price-new, .current-price, [data-price]"));
-                    for (const el of priceElems) {
-                        const txt = el.innerText.trim();
-                        if (txt && /\d/.test(txt)) {
-                            reg = txt;
-                            break;
-                        }
-                    }
+                    const pElem = findValid(".price, .product-price, .price-new, .current-price, [data-price]");
+                    if (pElem) reg = pElem.innerText;
                 }
                 return { reg, disc };
             }""")
@@ -128,6 +141,33 @@ class VariantExtractor:
                         }));
                     }
                 }
+
+                // Pattern C: Standard <select> dropdowns (WooCommerce/Shopify variations)
+                const selects = Array.from(document.querySelectorAll(".variations select, .product-options select, form.cart select, select[name*='attribute' i]"));
+                selects.forEach(sel => {
+                    const labelEl = sel.closest("tr, .form-group, div")?.querySelector("label");
+                    const rawHead = (labelEl ? labelEl.innerText : (sel.getAttribute("name") || "option")).replace(/^attribute_pa_|^attribute_/i, "");
+                    const cleanHead = rawHead.toLowerCase().replace(/[:*_-]/g, " ").trim() || "option";
+                    const opts = Array.from(sel.options).filter(o => o.value && !/choose|select/i.test(o.text));
+                    if (opts.length > 0) {
+                        if (!result[cleanHead]) result[cleanHead] = [];
+                        opts.forEach((o, idx) => {
+                            const lbl = o.text.trim();
+                            if (lbl && !result[cleanHead].some(x => x.label === lbl)) {
+                                result[cleanHead].push({
+                                    label: lbl,
+                                    is_oos: o.disabled,
+                                    is_selected: o.selected,
+                                    is_select_option: true,
+                                    select_name: sel.getAttribute("name") || "",
+                                    option_value: o.value,
+                                    selector: null,
+                                    index: idx
+                                });
+                            }
+                        });
+                    }
+                });
 
                 return result;
             }""")
@@ -211,20 +251,31 @@ class VariantExtractor:
                 is_oos = item.get("is_oos", False)
 
                 try:
-                    # Find and click element matching label
-                    clicked = await page.evaluate(r"""(label) => {
-                        const candidates = Array.from(document.querySelectorAll("button, a, .swatch, label, span, div"));
-                        for (const el of candidates) {
-                            if (el.innerText.trim().toLowerCase() === label.toLowerCase() ||
-                                el.getAttribute("title")?.trim().toLowerCase() === label.toLowerCase() ||
-                                el.getAttribute("data-value")?.trim().toLowerCase() === label.toLowerCase()) {
-                                el.scrollIntoView({ block: "nearest" });
-                                el.click();
-                                return true;
+                    # Handle <select> dropdown variants OR clickable button/swatch variants
+                    if item.get("is_select_option") and item.get("select_name") is not None:
+                        clicked = await page.evaluate(r"""({selName, optVal}) => {
+                            const sel = selName
+                                ? document.querySelector(`select[name="${selName}"]`)
+                                : document.querySelector(".variations select, .product-options select, form.cart select");
+                            if (!sel) return false;
+                            sel.value = optVal;
+                            sel.dispatchEvent(new Event("change", { bubbles: true }));
+                            return true;
+                        }""", {"selName": item.get("select_name"), "optVal": item.get("option_value")})
+                    else:
+                        clicked = await page.evaluate(r"""(label) => {
+                            const candidates = Array.from(document.querySelectorAll("button, a, .swatch, label, span, div"));
+                            for (const el of candidates) {
+                                if (el.innerText.trim().toLowerCase() === label.toLowerCase() ||
+                                    el.getAttribute("title")?.trim().toLowerCase() === label.toLowerCase() ||
+                                    el.getAttribute("data-value")?.trim().toLowerCase() === label.toLowerCase()) {
+                                    el.scrollIntoView({ block: "nearest" });
+                                    el.click();
+                                    return true;
+                                }
                             }
-                        }
-                        return false;
-                    }""", label)
+                            return false;
+                        }""", label)
 
                     if clicked:
                         await asyncio.sleep(0.35)

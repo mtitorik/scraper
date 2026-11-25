@@ -141,11 +141,15 @@ STRICT RULES:
         if not is_found:
             return "not found", "not found"
 
-        # If Gemini is disabled or no API key, return sanitized raw content
+        # If Gemini is disabled or no API key, return sanitized raw content formatted into clean <p> blocks
         if not self.settings.enable_gemini or not self.client:
             clean_specs = self.sanitize_competitor_content(specifications) or "not found"
             clean_raw = self.sanitize_competitor_content(raw_description)
-            clean_html = f"<p>{clean_raw}</p>" if clean_raw else "not found"
+            if clean_raw:
+                paragraphs = [p.strip() for p in re.split(r"\n\s*\n|\n", clean_raw) if p.strip()]
+                clean_html = "\n".join(f"<p>{p}</p>" for p in paragraphs)
+            else:
+                clean_html = "not found"
             return clean_specs, clean_html
 
         model_name = self.settings.gemini_model or "gemini-2.5-flash"
