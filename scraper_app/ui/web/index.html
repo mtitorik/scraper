@@ -507,6 +507,29 @@
 
           <div class="section-label">Speed, Pacing &amp; Completion</div>
           <div class="inset-group">
+            <div class="inset-field-row">
+              <div class="inset-field-label">
+                <label for="sel-parallel-mode">Parallel mode</label>
+                <span>How tabs divide work</span>
+              </div>
+              <div class="inset-field-control">
+                <select id="sel-parallel-mode" class="form-select">
+                  <option value="products">Products in Parallel (Website-First Queue)</option>
+                  <option value="websites">One Tab per Website (Parallel Sites)</option>
+                  <option value="split">Split Tabs Across Websites (e.g. 6 tabs ÷ 3 sites)</option>
+                </select>
+              </div>
+            </div>
+            <div class="inset-slider-row">
+              <div class="toggle-row-info">
+                <strong>Concurrent tabs</strong>
+                <span id="parallel-split-hint">3 tabs inside 1 Chrome window</span>
+              </div>
+              <div class="inline-slider-control">
+                <input type="range" id="range-concurrent-workers" min="1" max="20" value="3" step="1">
+                <input type="number" id="num-concurrent-workers" class="inline-num-input" min="1" value="3" title="Type any number of tabs (e.g. 6, 12, 24)">
+              </div>
+            </div>
             <div class="toggle-row">
               <div class="toggle-row-info">
                 <strong>Block 3rd-party trackers &amp; ads</strong>
@@ -608,7 +631,7 @@
                 <span>Recycles browser context above 85%.</span>
               </div>
               <div class="inline-slider-control">
-                <input type="range" id="range-ram-gb" min="1.0" max="8.0" value="2.0" step="0.5">
+                <input type="range" id="range-ram-gb" min="1.0" max="32.0" value="2.0" step="0.5">
                 <span class="slider-val" id="val-ram-gb">2.0 GB</span>
               </div>
             </div>

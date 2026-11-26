@@ -22,6 +22,7 @@ class BrowserManager:
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
         self._active_page: Optional[Page] = None
+        self._worker_pages: List[Page] = []
 
     @staticmethod
     def get_known_browser_paths() -> Dict[str, List[str]]:
@@ -187,6 +188,54 @@ class BrowserManager:
             await context.route("**/*", _route_filter)
         return context
 
+    async def create_worker_pages(self, count: int) -> List[Page]:
+        """Opens `count` concurrent tabs inside the single visible Incognito browser window."""
+        target = max(1, int(count))
+        first_page = await self.start()
+        # Keep any already-open live tabs, prune closed ones
+        live_pages = [p for p in self._worker_pages if not p.is_closed()]
+        if first_page not in live_pages and not first_page.is_closed():
+            live_pages.insert(0, first_page)
+
+        while len(live_pages) < target:
+            new_tab = await self._context.new_page()
+            live_pages.append(new_tab)
+
+        # Close surplus tabs if a later pass needs fewer workers
+        while len(live_pages) > target:
+            extra = live_pages.pop()
+            try:
+                await extra.close()
+            except Exception:
+                pass
+
+        self._worker_pages = live_pages
+        self._active_page = live_pages[0]
+        return list(live_pages)
+
+    async def recycle_page(self, page: Page) -> Page:
+        """Safely recycles a single worker tab without disturbing sibling concurrent tabs."""
+        if not self._context:
+            return await self.start()
+        try:
+            if page in self._worker_pages:
+                idx = self._worker_pages.index(page)
+            else:
+                idx = -1
+            if not page.is_closed():
+                await page.close()
+            fresh = await self._context.new_page()
+            if idx >= 0:
+                self._worker_pages[idx] = fresh
+            else:
+                self._worker_pages.append(fresh)
+            if self._active_page == page:
+                self._active_page = fresh
+            return fresh
+        except Exception as e:
+            print(f"[BrowserManager] Warning recycling tab: {e}")
+            return page
+
     async def recycle_context(self) -> Page:
         """Cleanly closes current context and opens a fresh one to release RAM cache."""
         print("[BrowserManager] Recycling browser context to free RAM...")
@@ -197,6 +246,7 @@ class BrowserManager:
                 print(f"[BrowserManager] Warning closing context: {e}")
         self._context = await self._create_incognito_context()
         self._active_page = await self._context.new_page()
+        self._worker_pages = [self._active_page]
         return self._active_page
 
     async def get_page(self) -> Page:
@@ -206,6 +256,7 @@ class BrowserManager:
 
     async def stop(self):
         """Cleanly closes context, browser, and playwright."""
+        self._worker_pages = []
         if self._context:
             try:
                 await self._context.close()

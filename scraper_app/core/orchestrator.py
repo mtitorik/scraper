@@ -57,6 +57,7 @@ class ScraperOrchestrator:
         self.stop_event = asyncio.Event()
         self.captcha_event = asyncio.Event()
         self.captcha_event.set()  # set means no active captcha
+        self._workbook_lock = asyncio.Lock()
 
         self.is_running = False
         self.is_paused = False
@@ -186,173 +187,349 @@ class ScraperOrchestrator:
             total_count = len(self.workbook_manager.get_all_records())
             self.on_log(f"Total products: {total_count}. Pending to process: {len(records_to_process)}")
 
-            # Step 2: Start visible Incognito browser
-            self.on_log(f"Launching visible Incognito browser ({self.settings.browser_mode})...")
-            page = await self.browser_manager.start()
+            # Step 2: Launch visible Incognito browser & run selected Parallel Mode
+            requested_workers = max(1, int(self.settings.concurrent_workers or 3))
+            parallel_mode = (self.settings.parallel_mode or "products").strip().lower()
+            if parallel_mode not in ("products", "websites", "split"):
+                parallel_mode = "products"
 
-            # Step 3: Website-First Waterfall Loop
-            # Pass 1: Search Website 1 for ALL pending/incomplete products
-            # Pass 2: Search Website 2 ONLY for products still missing or incomplete
-            # Pass N: Repeat sequentially; stop early as soon as all products are complete!
-            for site_idx, site_url in enumerate(websites, start=1):
-                if self.stop_event.is_set():
-                    self.on_log("Stop requested. Exiting queue...")
-                    break
+            custom_excludes = [
+                k.strip().lower()
+                for k in (self.settings.custom_exclude_keywords or "").split(",")
+                if k.strip()
+            ]
+            page_timeout_ms = max(10, int(self.settings.page_timeout_sec or 25)) * 1000
+            delay_s = float(self.settings.request_delay_sec or 0.0)
 
-                pending_for_pass = [
-                    rec for rec in self.workbook_manager.get_all_records()
-                    if rec.status in ("Pending", "In Progress", "Partial")
-                ]
+            self.on_log(
+                f"Launching visible Incognito browser ({self.settings.browser_mode} · mode={parallel_mode} · up to {requested_workers} tab(s))..."
+            )
 
-                if not pending_for_pass:
-                    self.on_log("All products are complete! Stopping waterfall early.")
-                    break
+            async def _fetch_site_payload(page, site_url: str, product_name: str, worker_tag: str) -> Dict[str, Any]:
+                """Searches & scrapes a single website on `page` without mutating shared WorkbookManager state."""
+                candidates = await SiteScraper.search_product(
+                    page=page,
+                    site_url=site_url,
+                    product_name=product_name,
+                    skip_preowned=self.settings.skip_preowned_devices,
+                    skip_accessories=self.settings.skip_accessories,
+                    strict_model_matching=self.settings.strict_model_matching,
+                    enable_fallback_sku_search=self.settings.enable_fallback_sku_search,
+                    custom_excludes=custom_excludes,
+                    page_timeout_ms=page_timeout_ms,
+                )
 
-                self.on_log(f"--- Pass {site_idx}/{len(websites)}: Searching {site_url} for {len(pending_for_pass)} pending product(s) ---")
+                if await PopupGuard.detect_human_verification(page):
+                    try:
+                        await page.bring_to_front()
+                    except Exception:
+                        pass
+                    self.on_log(f"[{worker_tag}] Human verification challenge detected on {site_url}! Pausing all tabs...")
+                    self.on_captcha_alert(site_url)
+                    self.captcha_event.clear()
+                    await self.captcha_event.wait()
 
-                for pass_idx, record in enumerate(pending_for_pass, start=1):
+                if not candidates:
+                    return {"site_url": site_url, "found": False, "pages": []}
+
+                scraped_pages: List[Dict[str, Any]] = []
+                for cand in candidates:
+                    if self.stop_event.is_set():
+                        break
+                    cand_url = cand["url"]
+                    self.on_log(f"[{worker_tag}] Scraping: {cand_url}")
+                    page_data = await SiteScraper.scrape_product_page(
+                        page=page,
+                        page_url=cand_url,
+                        target_product_name=product_name,
+                        source_website=site_url,
+                        pause_event=self.pause_event,
+                        stop_event=self.stop_event,
+                        throttle_callback=self.resource_guard.throttle_if_needed,
+                        scrape_variants=self.settings.scrape_variants,
+                        page_timeout_ms=page_timeout_ms,
+                    )
+                    # Offload synchronous HTTP image downloads + Pillow conversion to a worker thread!
+                    saved_folder = ""
+                    if self.settings.download_images and page_data["image_urls"]:
+                        img_urls = page_data["image_urls"]
+                        max_imgs = int(self.settings.max_images_per_product or 0)
+                        if max_imgs > 0:
+                            img_urls = img_urls[:max_imgs]
+                        saved_folder, _ = await asyncio.to_thread(
+                            self.image_downloader.download_product_images,
+                            product_name,
+                            img_urls,
+                        )
+                    page_data["saved_image_folder"] = saved_folder
+                    scraped_pages.append(page_data)
+
+                return {"site_url": site_url, "found": bool(scraped_pages), "pages": scraped_pages}
+
+            async def _commit_site_payload(record: ProductRecord, payload: Dict[str, Any], worker_tag: str, site_url: str):
+                """Merges scraped data into `record`, runs Gemini AI if enabled, and saves Excel under lock."""
+                if payload["found"]:
+                    # Run Gemini AI outside the workbook lock so sibling tabs can still save!
+                    processed_pages: List[Dict[str, Any]] = []
+                    for page_data in payload["pages"]:
+                        specs_in = record.specifications
+                        if page_data["specifications"] != "not found":
+                            specs_in = page_data["specifications"] if specs_in == "not found" else f"{specs_in}\n\n{page_data['specifications']}"
+                        clean_specs, clean_desc = await self.gemini_engine.process_product_content(
+                            product_name=record.product_name,
+                            raw_description=page_data["raw_description"],
+                            specifications=specs_in,
+                            is_found=True,
+                        )
+                        page_data["_clean_specs"] = clean_specs
+                        page_data["_clean_desc"] = clean_desc
+                        processed_pages.append(page_data)
+
+                    async with self._workbook_lock:
+                        if site_url not in record.scraped_sources:
+                            record.scraped_sources.append(site_url)
+                        for page_data in processed_pages:
+                            record.add_page_link(page_data["page_url"])
+                            if page_data["default_price"].regular:
+                                if not record.default_price.regular or record.default_price.regular == 0:
+                                    record.default_price = page_data["default_price"]
+                            for cat, entries in page_data["attribute_options"].items():
+                                if cat not in record.attribute_options:
+                                    record.attribute_options[cat] = []
+                                for entry in entries:
+                                    if not any(x.label == entry.label for x in record.attribute_options[cat]):
+                                        record.attribute_options[cat].append(entry)
+                            for combo in page_data["variant_combinations"]:
+                                record.variant_combinations.append(combo)
+                            if page_data.get("_clean_specs") and page_data["_clean_specs"] != "not found":
+                                record.specifications = page_data["_clean_specs"]
+                            if page_data.get("_clean_desc") and page_data["_clean_desc"] != "not found":
+                                record.description_html = page_data["_clean_desc"]
+                            if page_data["warranty"] and "Warranty" not in record.extra_fields:
+                                record.extra_fields["Warranty"] = page_data["warranty"]
+                            if page_data.get("saved_image_folder") and not record.image_folder:
+                                record.image_folder = page_data["saved_image_folder"]
+
+                        record.status = "Done" if self._is_row_complete(record) else "Partial"
+                        self.workbook_manager.update_record(record)
+                        await asyncio.to_thread(self.workbook_manager.save_workbook)
+                        self.on_row_updated(record.to_summary_dict())
+                        done_so_far = sum(1 for r in self.workbook_manager.get_all_records() if r.status == "Done")
+                        self.on_progress({
+                            "current": done_so_far,
+                            "total": total_count,
+                            "product_name": record.product_name,
+                            "site": site_url,
+                            "stage": worker_tag,
+                        })
+                        self.on_log(f"[{worker_tag}] Saved '{record.product_name}' -> {record.status}")
+                else:
+                    async with self._workbook_lock:
+                        self.on_log(f"[{worker_tag}] No match for '{record.product_name}' on {site_url}")
+                        if record.status != "Done":
+                            record.status = "Partial" if record.scraped_sources else "Pending"
+                            self.workbook_manager.update_record(record)
+                            self.on_row_updated(record.to_summary_dict())
+
+            # =====================================================================
+            # MODE A: Products in Parallel (Website-First Dynamic Queue — Default)
+            # =====================================================================
+            if parallel_mode == "products":
+                for site_idx, site_url in enumerate(websites, start=1):
                     if self.stop_event.is_set():
                         self.on_log("Stop requested. Exiting queue...")
                         break
 
-                    if not self.pause_event.is_set():
-                        self.on_log(f"Paused before processing '{record.product_name}'...")
-                        await self.pause_event.wait()
-
-                    await self.resource_guard.throttle_if_needed()
-
-                    done_so_far = sum(1 for r in self.workbook_manager.get_all_records() if r.status == "Done")
-                    record.status = "In Progress"
-                    self.workbook_manager.update_record(record)
-                    self.on_row_updated(record.to_summary_dict())
-
-                    self.on_progress({
-                        "current": done_so_far,
-                        "total": total_count,
-                        "product_name": record.product_name,
-                        "site": site_url,
-                        "stage": f"Pass {site_idx}/{len(websites)} ({pass_idx}/{len(pending_for_pass)})",
-                    })
-                    self.on_log(f"[Pass {site_idx} • {pass_idx}/{len(pending_for_pass)}] Searching '{record.product_name}' on {site_url}...")
-
-                    custom_excludes = [
-                        k.strip().lower()
-                        for k in (self.settings.custom_exclude_keywords or "").split(",")
-                        if k.strip()
+                    pending_for_pass = [
+                        rec for rec in self.workbook_manager.get_all_records()
+                        if rec.status in ("Pending", "In Progress", "Partial")
                     ]
+                    if not pending_for_pass:
+                        self.on_log("All products are complete! Stopping waterfall early.")
+                        break
 
-                    page_timeout_ms = max(10, int(self.settings.page_timeout_sec or 25)) * 1000
-                    candidates = await SiteScraper.search_product(
-                        page=page,
-                        site_url=site_url,
-                        product_name=record.product_name,
-                        skip_preowned=self.settings.skip_preowned_devices,
-                        skip_accessories=self.settings.skip_accessories,
-                        strict_model_matching=self.settings.strict_model_matching,
-                        enable_fallback_sku_search=self.settings.enable_fallback_sku_search,
-                        custom_excludes=custom_excludes,
-                        page_timeout_ms=page_timeout_ms,
+                    n_tabs = max(1, min(requested_workers, len(pending_for_pass)))
+                    worker_pages = await self.browser_manager.create_worker_pages(n_tabs)
+                    self.on_log(
+                        f"--- Pass {site_idx}/{len(websites)}: {site_url} · {len(pending_for_pass)} product(s) across {n_tabs} tab(s) ---"
                     )
 
-                    if await PopupGuard.detect_human_verification(page):
-                        self.on_log(f"Human verification challenge detected on {site_url}! Pausing for user...")
-                        self.on_captcha_alert(site_url)
-                        self.captcha_event.clear()
-                        await self.captcha_event.wait()
+                    queue: asyncio.Queue = asyncio.Queue()
+                    for rec in pending_for_pass:
+                        queue.put_nowait(rec)
 
-                    if not candidates:
-                        self.on_log(f"No match for '{record.product_name}' on {site_url}")
-                        # Keep Pending/Partial so next website pass checks it
-                        record.status = "Partial" if record.scraped_sources else "Pending"
+                    async def _product_worker(w_idx: int, tab_page):
+                        if w_idx > 0:
+                            await asyncio.sleep(0.35 * w_idx)
+                        tag = f"Tab {w_idx + 1} · Pass {site_idx}"
+                        while not self.stop_event.is_set():
+                            try:
+                                record: ProductRecord = queue.get_nowait()
+                            except asyncio.QueueEmpty:
+                                break
+                            try:
+                                if not self.pause_event.is_set():
+                                    await self.pause_event.wait()
+                                if not self.captcha_event.is_set():
+                                    await self.captcha_event.wait()
+                                if self.stop_event.is_set():
+                                    break
+
+                                await self.resource_guard.throttle_if_needed()
+
+                                async with self._workbook_lock:
+                                    record.status = "In Progress"
+                                    self.workbook_manager.update_record(record)
+                                    self.on_row_updated(record.to_summary_dict())
+                                    done_so_far = sum(1 for r in self.workbook_manager.get_all_records() if r.status == "Done")
+                                    self.on_progress({
+                                        "current": done_so_far,
+                                        "total": total_count,
+                                        "product_name": record.product_name,
+                                        "site": site_url,
+                                        "stage": tag,
+                                    })
+
+                                self.on_log(f"[{tag}] Searching '{record.product_name}' on {site_url}...")
+                                payload = await _fetch_site_payload(tab_page, site_url, record.product_name, tag)
+                                await _commit_site_payload(record, payload, tag, site_url)
+
+                                if delay_s > 0 and not self.stop_event.is_set():
+                                    await asyncio.sleep(delay_s)
+
+                                if self.resource_guard.should_recycle_browser():
+                                    self.on_log(f"[{tag}] RAM >85% — recycling tab...")
+                                    tab_page = await self.browser_manager.recycle_page(tab_page)
+                            finally:
+                                queue.task_done()
+
+                    await asyncio.gather(*[_product_worker(i, p) for i, p in enumerate(worker_pages)])
+
+            # =====================================================================
+            # MODE B: One Tab per Website (Parallel Sites, Strict Priority Merge)
+            # =====================================================================
+            elif parallel_mode == "websites":
+                pending_all = [
+                    rec for rec in self.workbook_manager.get_all_records()
+                    if rec.status in ("Pending", "In Progress", "Partial")
+                ]
+                n_tabs = max(1, min(requested_workers, len(websites)))
+                worker_pages = await self.browser_manager.create_worker_pages(n_tabs)
+                self.on_log(
+                    f"--- Parallel Sites Mode: {len(pending_all)} product(s) across {n_tabs} website tab(s) ---"
+                )
+
+                for p_idx, record in enumerate(pending_all, start=1):
+                    if self.stop_event.is_set():
+                        break
+                    if not self.pause_event.is_set():
+                        await self.pause_event.wait()
+                    if not self.captcha_event.is_set():
+                        await self.captcha_event.wait()
+                    await self.resource_guard.throttle_if_needed()
+
+                    async with self._workbook_lock:
+                        record.status = "In Progress"
                         self.workbook_manager.update_record(record)
                         self.on_row_updated(record.to_summary_dict())
-                        continue
 
-                    if site_url not in record.scraped_sources:
-                        record.scraped_sources.append(site_url)
+                    # Process websites in waves of n_tabs (stops early once product is complete!)
+                    for wave_start in range(0, len(websites), n_tabs):
+                        if self.stop_event.is_set() or self._is_row_complete(record):
+                            break
+                        wave_sites = websites[wave_start:wave_start + n_tabs]
 
-                    for cand in candidates:
-                        cand_url = cand["url"]
-                        self.on_log(f"Scraping product page: {cand_url}")
-                        record.add_page_link(cand_url)
+                        async def _site_task(tab_i: int, s_url: str):
+                            if tab_i > 0:
+                                await asyncio.sleep(0.25 * tab_i)
+                            tag = f"Site {wave_start + tab_i + 1} · {p_idx}/{len(pending_all)}"
+                            self.on_log(f"[{tag}] Searching '{record.product_name}' on {s_url}...")
+                            return await _fetch_site_payload(worker_pages[tab_i], s_url, record.product_name, tag)
 
-                        page_data = await SiteScraper.scrape_product_page(
-                            page=page,
-                            page_url=cand_url,
-                            target_product_name=record.product_name,
-                            source_website=site_url,
-                            pause_event=self.pause_event,
-                            stop_event=self.stop_event,
-                            throttle_callback=self.resource_guard.throttle_if_needed,
-                            scrape_variants=self.settings.scrape_variants,
-                            page_timeout_ms=page_timeout_ms,
-                        )
+                        wave_payloads = await asyncio.gather(*[
+                            _site_task(i, s_url) for i, s_url in enumerate(wave_sites)
+                        ])
 
-                        # Merge prices
-                        if page_data["default_price"].regular:
-                            if not record.default_price.regular or record.default_price.regular == 0:
-                                record.default_price = page_data["default_price"]
+                        # Merge in strict website priority order!
+                        for i, payload in enumerate(wave_payloads):
+                            if self._is_row_complete(record):
+                                break
+                            s_url = wave_sites[i]
+                            tag = f"Site {wave_start + i + 1}"
+                            await _commit_site_payload(record, payload, tag, s_url)
 
-                        # Merge attribute options
-                        for cat, entries in page_data["attribute_options"].items():
-                            if cat not in record.attribute_options:
-                                record.attribute_options[cat] = []
-                            for entry in entries:
-                                if not any(x.label == entry.label for x in record.attribute_options[cat]):
-                                    record.attribute_options[cat].append(entry)
-
-                        # Merge variant combinations for Sheet 2
-                        for combo in page_data["variant_combinations"]:
-                            record.variant_combinations.append(combo)
-
-                        # Merge specifications
-                        if page_data["specifications"] != "not found":
-                            if record.specifications == "not found":
-                                record.specifications = page_data["specifications"]
-                            else:
-                                record.specifications += f"\n\n{page_data['specifications']}"
-
-                        # Merge warranty
-                        if page_data["warranty"] and "Warranty" not in record.extra_fields:
-                            record.extra_fields["Warranty"] = page_data["warranty"]
-
-                        # Download and convert images (when enabled in Matching & Filtering Rules)
-                        if self.settings.download_images and page_data["image_urls"]:
-                            img_urls = page_data["image_urls"]
-                            max_imgs = int(self.settings.max_images_per_product or 0)
-                            if max_imgs > 0:
-                                img_urls = img_urls[:max_imgs]
-                            folder, saved_imgs = self.image_downloader.download_product_images(
-                                product_name=record.product_name,
-                                image_urls=img_urls,
-                            )
-                            record.image_folder = folder
-
-                        # Run Gemini AI processing
-                        clean_specs, clean_desc = await self.gemini_engine.process_product_content(
-                            product_name=record.product_name,
-                            raw_description=page_data["raw_description"],
-                            specifications=record.specifications,
-                            is_found=True,
-                        )
-                        record.specifications = clean_specs
-                        record.description_html = clean_desc
-
-                    record.status = "Done" if self._is_row_complete(record) else "Partial"
-                    self.workbook_manager.update_record(record)
-                    self.workbook_manager.save_workbook()
-                    self.on_row_updated(record.to_summary_dict())
-                    self.on_log(f"Saved '{record.product_name}' -> Status: {record.status}")
-
-                    # Optional politeness delay between products to avoid rate-limiting
-                    delay_s = float(self.settings.request_delay_sec or 0.0)
                     if delay_s > 0 and not self.stop_event.is_set():
                         await asyncio.sleep(delay_s)
 
-                    # Check RAM ceiling and recycle browser context if needed
-                    if self.resource_guard.should_recycle_browser():
-                        self.on_log("RAM ceiling reached (>85%). Recycling Incognito browser context...")
-                        page = await self.browser_manager.recycle_context()
+            # =====================================================================
+            # MODE C: Split Tabs Across Websites (Hybrid — e.g. 6 Tabs / 3 Sites = 2/Site)
+            # =====================================================================
+            else:
+                pending_all = [
+                    rec for rec in self.workbook_manager.get_all_records()
+                    if rec.status in ("Pending", "In Progress", "Partial")
+                ]
+                if pending_all:
+                    active_sites = websites[:requested_workers]
+                    n_tabs = max(1, min(requested_workers, len(active_sites) * len(pending_all)))
+                    worker_pages = await self.browser_manager.create_worker_pages(n_tabs)
+
+                    # Distribute tabs round-robin across active_sites (e.g. 6 tabs / 3 sites -> 2, 2, 2)
+                    site_queues: Dict[str, asyncio.Queue] = {}
+                    for s_url in active_sites:
+                        q: asyncio.Queue = asyncio.Queue()
+                        for rec in pending_all:
+                            q.put_nowait(rec)
+                        site_queues[s_url] = q
+
+                    tab_assignments = [active_sites[i % len(active_sites)] for i in range(n_tabs)]
+                    split_summary = ", ".join(
+                        f"Site #{idx + 1}: {tab_assignments.count(s)} tab(s)"
+                        for idx, s in enumerate(active_sites)
+                    )
+                    self.on_log(f"--- Hybrid Split Mode ({n_tabs} tabs across {len(active_sites)} sites): {split_summary} ---")
+
+                    async def _hybrid_worker(w_idx: int, tab_page, assigned_site: str):
+                        if w_idx > 0:
+                            await asyncio.sleep(0.3 * w_idx)
+                        site_num = active_sites.index(assigned_site) + 1
+                        tag = f"Tab {w_idx + 1} · Site {site_num}"
+                        q = site_queues[assigned_site]
+                        while not self.stop_event.is_set():
+                            try:
+                                record: ProductRecord = q.get_nowait()
+                            except asyncio.QueueEmpty:
+                                break
+                            try:
+                                if not self.pause_event.is_set():
+                                    await self.pause_event.wait()
+                                if not self.captcha_event.is_set():
+                                    await self.captcha_event.wait()
+                                if self.stop_event.is_set():
+                                    break
+
+                                # Skip if a higher-priority website already completed this product!
+                                if self._is_row_complete(record):
+                                    continue
+
+                                await self.resource_guard.throttle_if_needed()
+                                self.on_log(f"[{tag}] Searching '{record.product_name}' on {assigned_site}...")
+                                payload = await _fetch_site_payload(tab_page, assigned_site, record.product_name, tag)
+                                await _commit_site_payload(record, payload, tag, assigned_site)
+
+                                if delay_s > 0 and not self.stop_event.is_set():
+                                    await asyncio.sleep(delay_s)
+
+                                if self.resource_guard.should_recycle_browser():
+                                    self.on_log(f"[{tag}] RAM >85% — recycling tab...")
+                                    tab_page = await self.browser_manager.recycle_page(tab_page)
+                            finally:
+                                q.task_done()
+
+                    await asyncio.gather(*[
+                        _hybrid_worker(i, worker_pages[i], tab_assignments[i])
+                        for i in range(n_tabs)
+                    ])
 
             # Finalize any products still unmatched after all website passes
             if not self.stop_event.is_set():

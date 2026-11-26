@@ -42,6 +42,8 @@ class AppSettings:
     browser_mode: str = "auto"  # "auto", "chrome", "msedge", "brave", "bundled", "custom"
     custom_browser_path: str = ""
     block_trackers: bool = True
+    concurrent_workers: int = 3  # Unrestricted >= 1; bounded only by queue size & RAM ceiling
+    parallel_mode: str = "products"  # "products", "websites", or "split"
     request_delay_sec: float = 0.5
     page_timeout_sec: int = 25
 

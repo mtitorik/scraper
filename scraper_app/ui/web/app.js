@@ -140,6 +140,10 @@ const elements = {
   btnInstallChromium: document.getElementById("btn-install-chromium"),
   installProgressBox: document.getElementById("install-progress-box"),
   installLog: document.getElementById("install-log"),
+  selParallelMode: document.getElementById("sel-parallel-mode"),
+  rangeConcurrentWorkers: document.getElementById("range-concurrent-workers"),
+  numConcurrentWorkers: document.getElementById("num-concurrent-workers"),
+  parallelSplitHint: document.getElementById("parallel-split-hint"),
   chkBlockTrackers: document.getElementById("chk-block-trackers"),
   rangeRequestDelay: document.getElementById("range-request-delay"),
   valRequestDelay: document.getElementById("val-request-delay"),
@@ -468,6 +472,7 @@ const getCmdkItems = () => [
   { label: "AI & Store Brand", cat: "Settings", run: () => switchTab("tab-gemini") },
   { label: "Switch to Manual Product List", cat: "Run", run: () => { switchTab("tab-run"); setInputMode("manual", true); elements.manualQuickInput.focus(); } },
   { label: "Switch to Excel File Mode", cat: "Run", run: () => { switchTab("tab-run"); setInputMode("file", true); } },
+  { label: "Concurrent Tabs & Parallel Mode", cat: "Speed", run: () => { switchTab("tab-resources"); elements.numConcurrentWorkers.focus(); } },
   { label: "Politeness Delay (Rate-Limit Pacing)", cat: "Speed", run: () => { switchTab("tab-resources"); elements.rangeRequestDelay.focus(); } },
   { label: "Page Timeout", cat: "Speed", run: () => { switchTab("tab-resources"); elements.rangePageTimeout.focus(); } },
   { label: "Block 3rd-Party Trackers & Ads", cat: "Speed", run: () => { switchTab("tab-resources"); elements.chkBlockTrackers.focus(); } },
@@ -1122,6 +1127,7 @@ elements.btnHeaderStop.addEventListener("click", () => elements.btnStop.click())
 const renderWebsites = () => {
   const websites = appSettings.websites || [];
   elements.navWebsitesCount.textContent = String(websites.length);
+  updateParallelSplitHint();
   elements.websiteList.innerHTML = "";
 
   if (websites.length === 0) {
@@ -1335,6 +1341,52 @@ elements.rangeRamGb.addEventListener("input", (e) => {
   saveCurrentSettings();
 });
 
+const updateParallelSplitHint = () => {
+  if (!elements.parallelSplitHint) return;
+  const n = Math.max(1, parseInt(elements.numConcurrentWorkers.value, 10) || 1);
+  const mode = elements.selParallelMode.value || "products";
+  const siteCount = (appSettings.websites || []).length;
+
+  let text = "";
+  if (mode === "websites") {
+    const used = siteCount > 0 ? Math.min(n, siteCount) : n;
+    text = siteCount > 0
+      ? `1 tab per site (${used} active across ${siteCount} website${siteCount === 1 ? "" : "s"})`
+      : "1 dedicated tab per website";
+  } else if (mode === "split") {
+    if (siteCount > 0) {
+      const activeSites = Math.min(n, siteCount);
+      const base = Math.floor(n / activeSites);
+      const rem = n % activeSites;
+      const dist = rem > 0 ? `${base}–${base + 1}/site` : `${base}/site`;
+      text = `${n} tab${n === 1 ? "" : "s"} · ${dist} across ${activeSites} website${activeSites === 1 ? "" : "s"}`;
+    } else {
+      text = `${n} tab${n === 1 ? "" : "s"} split evenly across your websites`;
+    }
+  } else {
+    text = `${n} tab${n === 1 ? "" : "s"} on Website #1 first, then #2+ for missing items`;
+  }
+  if (n >= 8) text += " · watch RAM & rate-limits";
+  elements.parallelSplitHint.textContent = text;
+};
+
+const setConcurrentWorkers = (val, persist = true) => {
+  const clean = Math.max(1, parseInt(val, 10) || 1);
+  elements.numConcurrentWorkers.value = String(clean);
+  elements.rangeConcurrentWorkers.value = String(Math.min(20, clean));
+  appSettings.concurrent_workers = clean;
+  updateParallelSplitHint();
+  if (persist) saveCurrentSettings();
+};
+
+elements.rangeConcurrentWorkers.addEventListener("input", (e) => setConcurrentWorkers(e.target.value, true));
+elements.numConcurrentWorkers.addEventListener("change", (e) => setConcurrentWorkers(e.target.value, true));
+elements.selParallelMode.addEventListener("change", () => {
+  appSettings.parallel_mode = elements.selParallelMode.value;
+  updateParallelSplitHint();
+  saveCurrentSettings();
+});
+
 elements.rangeMaxImages.addEventListener("input", (e) => {
   const v = parseInt(e.target.value, 10);
   elements.valMaxImages.textContent = v === 0 ? "Unlimited" : `${v} max`;
@@ -1442,6 +1494,8 @@ const saveCurrentSettings = () => {
   appSettings.last_output_xlsx = elements.outputXlsxPath.value;
   appSettings.browser_mode = elements.selBrowserMode.value;
   appSettings.custom_browser_path = elements.customBrowserPath.value;
+  appSettings.parallel_mode = elements.selParallelMode.value;
+  appSettings.concurrent_workers = Math.max(1, parseInt(elements.numConcurrentWorkers.value, 10) || 3);
   appSettings.block_trackers = elements.chkBlockTrackers.checked;
   appSettings.request_delay_sec = parseFloat(elements.rangeRequestDelay.value);
   appSettings.page_timeout_sec = parseInt(elements.rangePageTimeout.value, 10);
@@ -1532,6 +1586,8 @@ const loadSettingsIntoUI = (s) => {
   elements.valMaxImages.textContent = maxImgs === 0 ? "Unlimited" : `${maxImgs} max`;
   elements.txtCustomExcludes.value = s.custom_exclude_keywords || "";
 
+  elements.selParallelMode.value = s.parallel_mode || "products";
+  setConcurrentWorkers(s.concurrent_workers ?? 3, false);
   elements.chkBlockTrackers.checked = s.block_trackers ?? true;
   const reqDelay = Number(s.request_delay_sec ?? 0.5);
   elements.rangeRequestDelay.value = reqDelay;

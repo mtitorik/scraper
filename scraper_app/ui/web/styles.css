@@ -516,6 +516,15 @@ body {
   flex-shrink: 0;
 }
 .inline-slider-control input[type="range"] { flex: 1; accent-color: var(--accent-primary); cursor: pointer; }
+.inline-num-input {
+  width: 58px !important;
+  text-align: center;
+  padding: 4px 6px !important;
+  font-size: 12px !important;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
 .slider-val {
   min-width: 60px;
   text-align: right;

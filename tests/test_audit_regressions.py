@@ -7,6 +7,18 @@ from PIL import Image
 from scraper_app.scraper.site_scraper import SiteScraper
 from scraper_app.browser.browser_manager import BrowserManager
 from scraper_app.media.image_downloader import ImageDownloader
+from scraper_app.config.settings import AppSettings
+
+
+def test_parallel_worker_settings_defaults_and_unrestricted_tabs():
+    default_s = AppSettings()
+    assert default_s.concurrent_workers == 3
+    assert default_s.parallel_mode == "products"
+
+    custom_s = AppSettings.from_dict({"concurrent_workers": 16, "parallel_mode": "split", "max_ram_gb": 16.0})
+    assert custom_s.concurrent_workers == 16
+    assert custom_s.parallel_mode == "split"
+    assert custom_s.max_ram_gb == 16.0
 
 
 def test_fallback_queries_ignore_english_hyphens_and_shorten_long_titles():
