@@ -27,6 +27,12 @@ class ScraperBridge:
         self.orchestrator: Optional[ScraperOrchestrator] = None
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.worker_thread: Optional[threading.Thread] = None
+        s = settings_manager.settings
+        self._idle_resource_guard = ResourceGuard(
+            max_cores=s.max_cpu_cores,
+            max_cpu_percent=s.max_cpu_percent,
+            max_ram_gb=s.max_ram_gb,
+        )
 
     def set_window(self, window: webview.Window):
         self.window = window
@@ -49,13 +55,24 @@ class ScraperBridge:
     def save_settings(self, data: Dict[str, Any]) -> bool:
         new_settings = AppSettings.from_dict(data)
         success = self.settings_manager.save(new_settings)
-        if success and self.orchestrator:
-            self.orchestrator.update_settings(new_settings)
+        if success:
+            self._idle_resource_guard.update_limits(
+                max_cores=new_settings.max_cpu_cores,
+                max_cpu_percent=new_settings.max_cpu_percent,
+                max_ram_gb=new_settings.max_ram_gb,
+            )
+            if self.orchestrator:
+                self.orchestrator.update_settings(new_settings)
         return success
 
     def reset_settings(self) -> Dict[str, Any]:
         defaults = AppSettings()
         self.settings_manager.save(defaults)
+        self._idle_resource_guard.update_limits(
+            max_cores=defaults.max_cpu_cores,
+            max_cpu_percent=defaults.max_cpu_percent,
+            max_ram_gb=defaults.max_ram_gb,
+        )
         if self.orchestrator:
             self.orchestrator.update_settings(defaults)
         return defaults.to_dict()
@@ -146,14 +163,9 @@ class ScraperBridge:
         return True
 
     def get_live_resources(self) -> Dict[str, Any]:
-        if self.orchestrator and self.orchestrator.resource_guard:
+        if self.orchestrator and self.orchestrator.is_running and self.orchestrator.resource_guard:
             return self.orchestrator.resource_guard.get_live_metrics()
-        rg = ResourceGuard(
-            max_cores=self.settings_manager.settings.max_cpu_cores,
-            max_cpu_percent=self.settings_manager.settings.max_cpu_percent,
-            max_ram_gb=self.settings_manager.settings.max_ram_gb,
-        )
-        return rg.get_live_metrics()
+        return self._idle_resource_guard.get_live_metrics()
 
     # --- Live Table Data ---
     def get_current_table_data(self) -> Dict[str, Any]:

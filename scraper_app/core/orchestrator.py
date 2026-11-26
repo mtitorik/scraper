@@ -187,11 +187,11 @@ class ScraperOrchestrator:
             total_count = len(self.workbook_manager.get_all_records())
             self.on_log(f"Total products: {total_count}. Pending to process: {len(records_to_process)}")
 
-            # Step 2: Launch visible Incognito browser & run selected Parallel Mode
-            requested_workers = max(1, int(self.settings.concurrent_workers or 3))
-            parallel_mode = (self.settings.parallel_mode or "products").strip().lower()
-            if parallel_mode not in ("products", "websites", "split"):
-                parallel_mode = "products"
+            # Step 2: Launch visible Incognito browser & run unified 2-axis wave engine
+            # parallel_websites = how many different websites run at once
+            # tabs_per_website  = how many tabs each website gets for different products
+            parallel_websites = max(1, int(self.settings.parallel_websites or 1))
+            tabs_per_website = max(1, int(self.settings.tabs_per_website or 3))
 
             custom_excludes = [
                 k.strip().lower()
@@ -202,7 +202,7 @@ class ScraperOrchestrator:
             delay_s = float(self.settings.request_delay_sec or 0.0)
 
             self.on_log(
-                f"Launching visible Incognito browser ({self.settings.browser_mode} · mode={parallel_mode} · up to {requested_workers} tab(s))..."
+                f"Launching visible Incognito browser ({self.settings.browser_mode} · {parallel_websites} website(s) at once × {tabs_per_website} tab(s)/website)..."
             )
 
             async def _fetch_site_payload(page, site_url: str, product_name: str, worker_tag: str) -> Dict[str, Any]:
@@ -332,204 +332,99 @@ class ScraperOrchestrator:
                             self.on_row_updated(record.to_summary_dict())
 
             # =====================================================================
-            # MODE A: Products in Parallel (Website-First Dynamic Queue — Default)
+            # Unified 2-Axis Wave Engine: (Websites at once) × (Tabs per website)
             # =====================================================================
-            if parallel_mode == "products":
-                for site_idx, site_url in enumerate(websites, start=1):
-                    if self.stop_event.is_set():
-                        self.on_log("Stop requested. Exiting queue...")
-                        break
+            for wave_start in range(0, len(websites), parallel_websites):
+                if self.stop_event.is_set():
+                    self.on_log("Stop requested. Exiting queue...")
+                    break
 
-                    pending_for_pass = [
-                        rec for rec in self.workbook_manager.get_all_records()
-                        if rec.status in ("Pending", "In Progress", "Partial")
-                    ]
-                    if not pending_for_pass:
-                        self.on_log("All products are complete! Stopping waterfall early.")
-                        break
+                pending_for_wave = [
+                    rec for rec in self.workbook_manager.get_all_records()
+                    if rec.status in ("Pending", "In Progress", "Partial")
+                ]
+                if not pending_for_wave:
+                    self.on_log("All products are complete! Stopping early.")
+                    break
 
-                    n_tabs = max(1, min(requested_workers, len(pending_for_pass)))
-                    worker_pages = await self.browser_manager.create_worker_pages(n_tabs)
-                    self.on_log(
-                        f"--- Pass {site_idx}/{len(websites)}: {site_url} · {len(pending_for_pass)} product(s) across {n_tabs} tab(s) ---"
-                    )
+                wave_sites = websites[wave_start:wave_start + parallel_websites]
+                per_site_tabs = max(1, min(tabs_per_website, len(pending_for_wave)))
+                total_tabs = len(wave_sites) * per_site_tabs
+                worker_pages = await self.browser_manager.create_worker_pages(total_tabs)
 
-                    queue: asyncio.Queue = asyncio.Queue()
-                    for rec in pending_for_pass:
-                        queue.put_nowait(rec)
+                wave_num = (wave_start // parallel_websites) + 1
+                total_waves = (len(websites) + parallel_websites - 1) // parallel_websites
+                self.on_log(
+                    f"--- Wave {wave_num}/{total_waves}: {len(wave_sites)} website(s) × {per_site_tabs} tab(s)/site = {total_tabs} tab(s) ({len(pending_for_wave)} pending) ---"
+                )
 
-                    async def _product_worker(w_idx: int, tab_page):
-                        if w_idx > 0:
-                            await asyncio.sleep(0.35 * w_idx)
-                        tag = f"Tab {w_idx + 1} · Pass {site_idx}"
-                        while not self.stop_event.is_set():
-                            try:
-                                record: ProductRecord = queue.get_nowait()
-                            except asyncio.QueueEmpty:
+                site_queues: Dict[str, asyncio.Queue] = {}
+                for s_url in wave_sites:
+                    q: asyncio.Queue = asyncio.Queue()
+                    for rec in pending_for_wave:
+                        q.put_nowait(rec)
+                    site_queues[s_url] = q
+
+                async def _wave_worker(tab_idx: int, tab_page, s_url: str, site_rank: int):
+                    if tab_idx > 0:
+                        await asyncio.sleep(0.25 * tab_idx)
+                    tag = f"Tab {tab_idx + 1} · Site #{site_rank}"
+                    q = site_queues[s_url]
+                    while not self.stop_event.is_set():
+                        try:
+                            record: ProductRecord = q.get_nowait()
+                        except asyncio.QueueEmpty:
+                            break
+                        try:
+                            if not self.pause_event.is_set():
+                                await self.pause_event.wait()
+                            if not self.captcha_event.is_set():
+                                await self.captcha_event.wait()
+                            if self.stop_event.is_set():
                                 break
-                            try:
-                                if not self.pause_event.is_set():
-                                    await self.pause_event.wait()
-                                if not self.captcha_event.is_set():
-                                    await self.captcha_event.wait()
-                                if self.stop_event.is_set():
-                                    break
 
-                                await self.resource_guard.throttle_if_needed()
+                            # Skip if another website already completed this product!
+                            if self._is_row_complete(record):
+                                continue
 
-                                async with self._workbook_lock:
+                            await self.resource_guard.throttle_if_needed()
+
+                            async with self._workbook_lock:
+                                if record.status == "Pending":
                                     record.status = "In Progress"
                                     self.workbook_manager.update_record(record)
                                     self.on_row_updated(record.to_summary_dict())
-                                    done_so_far = sum(1 for r in self.workbook_manager.get_all_records() if r.status == "Done")
-                                    self.on_progress({
-                                        "current": done_so_far,
-                                        "total": total_count,
-                                        "product_name": record.product_name,
-                                        "site": site_url,
-                                        "stage": tag,
-                                    })
+                                done_so_far = sum(1 for r in self.workbook_manager.get_all_records() if r.status == "Done")
+                                self.on_progress({
+                                    "current": done_so_far,
+                                    "total": total_count,
+                                    "product_name": record.product_name,
+                                    "site": s_url,
+                                    "stage": tag,
+                                })
 
-                                self.on_log(f"[{tag}] Searching '{record.product_name}' on {site_url}...")
-                                payload = await _fetch_site_payload(tab_page, site_url, record.product_name, tag)
-                                await _commit_site_payload(record, payload, tag, site_url)
-
-                                if delay_s > 0 and not self.stop_event.is_set():
-                                    await asyncio.sleep(delay_s)
-
-                                if self.resource_guard.should_recycle_browser():
-                                    self.on_log(f"[{tag}] RAM >85% — recycling tab...")
-                                    tab_page = await self.browser_manager.recycle_page(tab_page)
-                            finally:
-                                queue.task_done()
-
-                    await asyncio.gather(*[_product_worker(i, p) for i, p in enumerate(worker_pages)])
-
-            # =====================================================================
-            # MODE B: One Tab per Website (Parallel Sites, Strict Priority Merge)
-            # =====================================================================
-            elif parallel_mode == "websites":
-                pending_all = [
-                    rec for rec in self.workbook_manager.get_all_records()
-                    if rec.status in ("Pending", "In Progress", "Partial")
-                ]
-                n_tabs = max(1, min(requested_workers, len(websites)))
-                worker_pages = await self.browser_manager.create_worker_pages(n_tabs)
-                self.on_log(
-                    f"--- Parallel Sites Mode: {len(pending_all)} product(s) across {n_tabs} website tab(s) ---"
-                )
-
-                for p_idx, record in enumerate(pending_all, start=1):
-                    if self.stop_event.is_set():
-                        break
-                    if not self.pause_event.is_set():
-                        await self.pause_event.wait()
-                    if not self.captcha_event.is_set():
-                        await self.captcha_event.wait()
-                    await self.resource_guard.throttle_if_needed()
-
-                    async with self._workbook_lock:
-                        record.status = "In Progress"
-                        self.workbook_manager.update_record(record)
-                        self.on_row_updated(record.to_summary_dict())
-
-                    # Process websites in waves of n_tabs (stops early once product is complete!)
-                    for wave_start in range(0, len(websites), n_tabs):
-                        if self.stop_event.is_set() or self._is_row_complete(record):
-                            break
-                        wave_sites = websites[wave_start:wave_start + n_tabs]
-
-                        async def _site_task(tab_i: int, s_url: str):
-                            if tab_i > 0:
-                                await asyncio.sleep(0.25 * tab_i)
-                            tag = f"Site {wave_start + tab_i + 1} · {p_idx}/{len(pending_all)}"
                             self.on_log(f"[{tag}] Searching '{record.product_name}' on {s_url}...")
-                            return await _fetch_site_payload(worker_pages[tab_i], s_url, record.product_name, tag)
-
-                        wave_payloads = await asyncio.gather(*[
-                            _site_task(i, s_url) for i, s_url in enumerate(wave_sites)
-                        ])
-
-                        # Merge in strict website priority order!
-                        for i, payload in enumerate(wave_payloads):
-                            if self._is_row_complete(record):
-                                break
-                            s_url = wave_sites[i]
-                            tag = f"Site {wave_start + i + 1}"
+                            payload = await _fetch_site_payload(tab_page, s_url, record.product_name, tag)
                             await _commit_site_payload(record, payload, tag, s_url)
 
-                    if delay_s > 0 and not self.stop_event.is_set():
-                        await asyncio.sleep(delay_s)
+                            if delay_s > 0 and not self.stop_event.is_set():
+                                await asyncio.sleep(delay_s)
 
-            # =====================================================================
-            # MODE C: Split Tabs Across Websites (Hybrid — e.g. 6 Tabs / 3 Sites = 2/Site)
-            # =====================================================================
-            else:
-                pending_all = [
-                    rec for rec in self.workbook_manager.get_all_records()
-                    if rec.status in ("Pending", "In Progress", "Partial")
-                ]
-                if pending_all:
-                    active_sites = websites[:requested_workers]
-                    n_tabs = max(1, min(requested_workers, len(active_sites) * len(pending_all)))
-                    worker_pages = await self.browser_manager.create_worker_pages(n_tabs)
+                            if self.resource_guard.should_recycle_browser():
+                                self.on_log(f"[{tag}] RAM >85% — recycling tab...")
+                                tab_page = await self.browser_manager.recycle_page(tab_page)
+                        finally:
+                            q.task_done()
 
-                    # Distribute tabs round-robin across active_sites (e.g. 6 tabs / 3 sites -> 2, 2, 2)
-                    site_queues: Dict[str, asyncio.Queue] = {}
-                    for s_url in active_sites:
-                        q: asyncio.Queue = asyncio.Queue()
-                        for rec in pending_all:
-                            q.put_nowait(rec)
-                        site_queues[s_url] = q
+                tasks = []
+                tab_cursor = 0
+                for s_offset, s_url in enumerate(wave_sites):
+                    site_rank = wave_start + s_offset + 1
+                    for _ in range(per_site_tabs):
+                        tasks.append(_wave_worker(tab_cursor, worker_pages[tab_cursor], s_url, site_rank))
+                        tab_cursor += 1
 
-                    tab_assignments = [active_sites[i % len(active_sites)] for i in range(n_tabs)]
-                    split_summary = ", ".join(
-                        f"Site #{idx + 1}: {tab_assignments.count(s)} tab(s)"
-                        for idx, s in enumerate(active_sites)
-                    )
-                    self.on_log(f"--- Hybrid Split Mode ({n_tabs} tabs across {len(active_sites)} sites): {split_summary} ---")
-
-                    async def _hybrid_worker(w_idx: int, tab_page, assigned_site: str):
-                        if w_idx > 0:
-                            await asyncio.sleep(0.3 * w_idx)
-                        site_num = active_sites.index(assigned_site) + 1
-                        tag = f"Tab {w_idx + 1} · Site {site_num}"
-                        q = site_queues[assigned_site]
-                        while not self.stop_event.is_set():
-                            try:
-                                record: ProductRecord = q.get_nowait()
-                            except asyncio.QueueEmpty:
-                                break
-                            try:
-                                if not self.pause_event.is_set():
-                                    await self.pause_event.wait()
-                                if not self.captcha_event.is_set():
-                                    await self.captcha_event.wait()
-                                if self.stop_event.is_set():
-                                    break
-
-                                # Skip if a higher-priority website already completed this product!
-                                if self._is_row_complete(record):
-                                    continue
-
-                                await self.resource_guard.throttle_if_needed()
-                                self.on_log(f"[{tag}] Searching '{record.product_name}' on {assigned_site}...")
-                                payload = await _fetch_site_payload(tab_page, assigned_site, record.product_name, tag)
-                                await _commit_site_payload(record, payload, tag, assigned_site)
-
-                                if delay_s > 0 and not self.stop_event.is_set():
-                                    await asyncio.sleep(delay_s)
-
-                                if self.resource_guard.should_recycle_browser():
-                                    self.on_log(f"[{tag}] RAM >85% — recycling tab...")
-                                    tab_page = await self.browser_manager.recycle_page(tab_page)
-                            finally:
-                                q.task_done()
-
-                    await asyncio.gather(*[
-                        _hybrid_worker(i, worker_pages[i], tab_assignments[i])
-                        for i in range(n_tabs)
-                    ])
+                await asyncio.gather(*tasks)
 
             # Finalize any products still unmatched after all website passes
             if not self.stop_event.is_set():

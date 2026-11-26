@@ -247,17 +247,44 @@ body {
   flex-shrink: 0;
 }
 
-.resource-mini-meter { padding: 4px 6px; }
+.resource-mini-meter {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 7px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mini-metric { display: flex; flex-direction: column; gap: 3px; }
 .mini-meter-label {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--text-muted);
-  margin-bottom: 5px;
 }
-.mini-meter-label strong { color: var(--text-secondary); font-weight: 550; font-variant-numeric: tabular-nums; }
+.mini-meter-label strong { color: var(--text-main); font-weight: 600; font-variant-numeric: tabular-nums; }
 .mini-progress-bar { height: 3px; background: var(--border-color); border-radius: 999px; overflow: hidden; }
 .mini-progress-fill { height: 100%; background: var(--accent-primary); transition: width 0.3s ease; }
+.mini-ram-free {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.parallel-summary-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+.parallel-summary-row strong { color: var(--accent-text); font-weight: 600; white-space: nowrap; }
+.parallel-summary-row span { color: var(--text-secondary); text-align: right; }
 
 .theme-segmented {
   display: grid;
@@ -299,8 +326,20 @@ body {
 .sidebar.collapsed .nav-section-label,
 .sidebar.collapsed .nav-item span,
 .sidebar.collapsed .nav-badge,
-.sidebar.collapsed .resource-mini-meter,
+.sidebar.collapsed .mini-ram-free,
+.sidebar.collapsed .mini-progress-bar,
 .sidebar.collapsed .theme-seg-btn span { display: none; }
+.sidebar.collapsed .resource-mini-meter {
+  padding: 5px 3px;
+  gap: 4px;
+}
+.sidebar.collapsed .mini-meter-label {
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  font-size: 9px;
+}
+.sidebar.collapsed .mini-meter-label strong { font-size: 9.5px; }
 .sidebar.collapsed .sidebar-collapse-btn { margin-left: 0; transform: rotate(180deg); }
 .sidebar.collapsed .nav-item { justify-content: center; padding: 8px 0; }
 .sidebar.collapsed .theme-segmented { grid-template-columns: 1fr; }

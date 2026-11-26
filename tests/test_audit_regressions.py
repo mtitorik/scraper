@@ -8,17 +8,23 @@ from scraper_app.scraper.site_scraper import SiteScraper
 from scraper_app.browser.browser_manager import BrowserManager
 from scraper_app.media.image_downloader import ImageDownloader
 from scraper_app.config.settings import AppSettings
+from scraper_app.core.resource_guard import ResourceGuard
 
 
 def test_parallel_worker_settings_defaults_and_unrestricted_tabs():
     default_s = AppSettings()
-    assert default_s.concurrent_workers == 3
-    assert default_s.parallel_mode == "products"
+    assert default_s.parallel_websites == 1
+    assert default_s.tabs_per_website == 3
 
-    custom_s = AppSettings.from_dict({"concurrent_workers": 16, "parallel_mode": "split", "max_ram_gb": 16.0})
-    assert custom_s.concurrent_workers == 16
-    assert custom_s.parallel_mode == "split"
+    custom_s = AppSettings.from_dict({"parallel_websites": 4, "tabs_per_website": 5, "max_ram_gb": 16.0})
+    assert custom_s.parallel_websites == 4
+    assert custom_s.tabs_per_website == 5
     assert custom_s.max_ram_gb == 16.0
+
+    rg = ResourceGuard(max_cores=2, max_cpu_percent=50, max_ram_gb=4.0)
+    metrics = rg.get_live_metrics()
+    assert "system_ram_free_gb" in metrics
+    assert "cpu_percent" in metrics
 
 
 def test_fallback_queries_ignore_english_hyphens_and_shorten_long_titles():

@@ -60,12 +60,22 @@
       </nav>
 
       <div class="sidebar-footer">
-        <div class="resource-mini-meter">
-          <div class="mini-meter-label">
-            <span>CPU <strong id="mini-cpu">0%</strong></span>
-            <span>RAM <strong id="mini-ram">0 MB</strong></span>
+        <div class="resource-mini-meter" id="sidebar-resource-meter" title="Live Scraper + Chrome CPU &amp; RAM">
+          <div class="mini-metric">
+            <div class="mini-meter-label">
+              <span>CPU</span>
+              <strong id="mini-cpu">0%</strong>
+            </div>
+            <div class="mini-progress-bar"><div class="mini-progress-fill" id="mini-cpu-bar" style="width: 0%"></div></div>
           </div>
-          <div class="mini-progress-bar"><div class="mini-progress-fill" id="mini-ram-bar" style="width: 0%"></div></div>
+          <div class="mini-metric">
+            <div class="mini-meter-label">
+              <span>RAM</span>
+              <strong id="mini-ram">0 MB</strong>
+            </div>
+            <div class="mini-progress-bar"><div class="mini-progress-fill" id="mini-ram-bar" style="width: 0%"></div></div>
+          </div>
+          <div class="mini-ram-free" id="mini-ram-free">Checking free RAM…</div>
         </div>
 
         <div class="theme-segmented" role="group" aria-label="Appearance">
@@ -507,28 +517,29 @@
 
           <div class="section-label">Speed, Pacing &amp; Completion</div>
           <div class="inset-group">
-            <div class="inset-field-row">
-              <div class="inset-field-label">
-                <label for="sel-parallel-mode">Parallel mode</label>
-                <span>How tabs divide work</span>
+            <div class="inset-slider-row">
+              <div class="toggle-row-info">
+                <strong>Websites at the same time</strong>
+                <span>How many different websites to search at once.</span>
               </div>
-              <div class="inset-field-control">
-                <select id="sel-parallel-mode" class="form-select">
-                  <option value="products">Products in Parallel (Website-First Queue)</option>
-                  <option value="websites">One Tab per Website (Parallel Sites)</option>
-                  <option value="split">Split Tabs Across Websites (e.g. 6 tabs ÷ 3 sites)</option>
-                </select>
+              <div class="inline-slider-control">
+                <input type="range" id="range-parallel-websites" min="1" max="10" value="1" step="1">
+                <input type="number" id="num-parallel-websites" class="inline-num-input" min="1" value="1" title="Number of different websites to open at once">
               </div>
             </div>
             <div class="inset-slider-row">
               <div class="toggle-row-info">
-                <strong>Concurrent tabs</strong>
-                <span id="parallel-split-hint">3 tabs inside 1 Chrome window</span>
+                <strong>Tabs per website</strong>
+                <span>How many products to search at once on each website.</span>
               </div>
               <div class="inline-slider-control">
-                <input type="range" id="range-concurrent-workers" min="1" max="20" value="3" step="1">
-                <input type="number" id="num-concurrent-workers" class="inline-num-input" min="1" value="3" title="Type any number of tabs (e.g. 6, 12, 24)">
+                <input type="range" id="range-tabs-per-website" min="1" max="10" value="3" step="1">
+                <input type="number" id="num-tabs-per-website" class="inline-num-input" min="1" value="3" title="Number of tabs per website (type any number)">
               </div>
+            </div>
+            <div class="parallel-summary-row">
+              <strong id="parallel-total-title">Opens 3 tabs total</strong>
+              <span id="parallel-total-desc">3 products at once on 1 website at a time.</span>
             </div>
             <div class="toggle-row">
               <div class="toggle-row-info">

@@ -20,6 +20,12 @@ class ResourceGuard:
         self.max_cpu_percent = max_cpu_percent
         self.max_ram_gb = max_ram_gb
         self.process = psutil.Process() if psutil else None
+        self._child_cache: Dict[int, Any] = {}
+        if self.process:
+            try:
+                self.process.cpu_percent(interval=None)  # Prime baseline delta
+            except Exception:
+                pass
         self._apply_core_affinity()
 
     def update_limits(self, max_cores: Optional[int] = None, max_cpu_percent: Optional[int] = None, max_ram_gb: Optional[float] = None):
@@ -58,20 +64,37 @@ class ResourceGuard:
         return total_rss
 
     def get_process_tree_cpu_percent(self) -> float:
-        """Estimates total CPU usage percentage across the process tree."""
+        """Estimates live CPU usage percentage (0-100% system scale) across Python + all Chromium child processes."""
         if not self.process:
             return 0.0
         total_cpu = 0.0
         try:
             total_cpu += self.process.cpu_percent(interval=None)
+            live_pids = set()
             for child in self.process.children(recursive=True):
-                try:
-                    total_cpu += child.cpu_percent(interval=None)
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    continue
+                pid = child.pid
+                live_pids.add(pid)
+                cached = self._child_cache.get(pid)
+                if cached is None:
+                    try:
+                        child.cpu_percent(interval=None)  # Prime new child process
+                        self._child_cache[pid] = child
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+                else:
+                    try:
+                        total_cpu += cached.cpu_percent(interval=None)
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        self._child_cache.pop(pid, None)
+            # Prune exited child PIDs
+            for stale_pid in list(self._child_cache.keys()):
+                if stale_pid not in live_pids:
+                    self._child_cache.pop(stale_pid, None)
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
-        return round(total_cpu, 1)
+        num_cores = max(1, os.cpu_count() or 1)
+        normalized = min(100.0, total_cpu / num_cores)
+        return round(normalized, 1)
 
     def should_recycle_browser(self) -> bool:
         """Returns True if RAM usage approaches or exceeds 85% of the configured limit."""
@@ -109,6 +132,16 @@ class ResourceGuard:
         cap_gb = self.max_ram_gb if self.max_ram_gb > 0 else 1.0
         mem_percent_of_cap = min(round((mem_gb / cap_gb) * 100, 1), 100.0)
 
+        sys_free_gb = 0.0
+        sys_total_gb = 0.0
+        if psutil:
+            try:
+                vm = psutil.virtual_memory()
+                sys_free_gb = round(vm.available / (1024 * 1024 * 1024), 1)
+                sys_total_gb = round(vm.total / (1024 * 1024 * 1024), 1)
+            except Exception:
+                pass
+
         return {
             "cpu_percent": cpu_percent,
             "max_cpu_percent": self.max_cpu_percent,
@@ -116,5 +149,7 @@ class ResourceGuard:
             "memory_gb": mem_gb,
             "max_ram_gb": self.max_ram_gb,
             "memory_percent_of_cap": mem_percent_of_cap,
+            "system_ram_free_gb": sys_free_gb,
+            "system_ram_total_gb": sys_total_gb,
             "should_recycle": self.should_recycle_browser(),
         }

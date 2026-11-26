@@ -140,10 +140,12 @@ const elements = {
   btnInstallChromium: document.getElementById("btn-install-chromium"),
   installProgressBox: document.getElementById("install-progress-box"),
   installLog: document.getElementById("install-log"),
-  selParallelMode: document.getElementById("sel-parallel-mode"),
-  rangeConcurrentWorkers: document.getElementById("range-concurrent-workers"),
-  numConcurrentWorkers: document.getElementById("num-concurrent-workers"),
-  parallelSplitHint: document.getElementById("parallel-split-hint"),
+  rangeParallelWebsites: document.getElementById("range-parallel-websites"),
+  numParallelWebsites: document.getElementById("num-parallel-websites"),
+  rangeTabsPerWebsite: document.getElementById("range-tabs-per-website"),
+  numTabsPerWebsite: document.getElementById("num-tabs-per-website"),
+  parallelTotalTitle: document.getElementById("parallel-total-title"),
+  parallelTotalDesc: document.getElementById("parallel-total-desc"),
   chkBlockTrackers: document.getElementById("chk-block-trackers"),
   rangeRequestDelay: document.getElementById("range-request-delay"),
   valRequestDelay: document.getElementById("val-request-delay"),
@@ -185,8 +187,10 @@ const elements = {
   btnCopyLog: document.getElementById("btn-copy-log"),
   btnClearLog: document.getElementById("btn-clear-log"),
   miniCpu: document.getElementById("mini-cpu"),
+  miniCpuBar: document.getElementById("mini-cpu-bar"),
   miniRam: document.getElementById("mini-ram"),
   miniRamBar: document.getElementById("mini-ram-bar"),
+  miniRamFree: document.getElementById("mini-ram-free"),
   btnThemeDark: document.getElementById("btn-theme-dark"),
   btnThemeLight: document.getElementById("btn-theme-light"),
 
@@ -472,7 +476,7 @@ const getCmdkItems = () => [
   { label: "AI & Store Brand", cat: "Settings", run: () => switchTab("tab-gemini") },
   { label: "Switch to Manual Product List", cat: "Run", run: () => { switchTab("tab-run"); setInputMode("manual", true); elements.manualQuickInput.focus(); } },
   { label: "Switch to Excel File Mode", cat: "Run", run: () => { switchTab("tab-run"); setInputMode("file", true); } },
-  { label: "Concurrent Tabs & Parallel Mode", cat: "Speed", run: () => { switchTab("tab-resources"); elements.numConcurrentWorkers.focus(); } },
+  { label: "Websites at Once & Tabs per Website", cat: "Speed", run: () => { switchTab("tab-resources"); elements.numParallelWebsites.focus(); } },
   { label: "Politeness Delay (Rate-Limit Pacing)", cat: "Speed", run: () => { switchTab("tab-resources"); elements.rangeRequestDelay.focus(); } },
   { label: "Page Timeout", cat: "Speed", run: () => { switchTab("tab-resources"); elements.rangePageTimeout.focus(); } },
   { label: "Block 3rd-Party Trackers & Ads", cat: "Speed", run: () => { switchTab("tab-resources"); elements.chkBlockTrackers.focus(); } },
@@ -1342,50 +1346,43 @@ elements.rangeRamGb.addEventListener("input", (e) => {
 });
 
 const updateParallelSplitHint = () => {
-  if (!elements.parallelSplitHint) return;
-  const n = Math.max(1, parseInt(elements.numConcurrentWorkers.value, 10) || 1);
-  const mode = elements.selParallelMode.value || "products";
+  if (!elements.parallelTotalTitle || !elements.parallelTotalDesc) return;
+  const w = Math.max(1, parseInt(elements.numParallelWebsites.value, 10) || 1);
+  const t = Math.max(1, parseInt(elements.numTabsPerWebsite.value, 10) || 1);
   const siteCount = (appSettings.websites || []).length;
+  const effectiveSites = siteCount > 0 ? Math.min(w, siteCount) : w;
+  const totalTabs = effectiveSites * t;
 
-  let text = "";
-  if (mode === "websites") {
-    const used = siteCount > 0 ? Math.min(n, siteCount) : n;
-    text = siteCount > 0
-      ? `1 tab per site (${used} active across ${siteCount} website${siteCount === 1 ? "" : "s"})`
-      : "1 dedicated tab per website";
-  } else if (mode === "split") {
-    if (siteCount > 0) {
-      const activeSites = Math.min(n, siteCount);
-      const base = Math.floor(n / activeSites);
-      const rem = n % activeSites;
-      const dist = rem > 0 ? `${base}–${base + 1}/site` : `${base}/site`;
-      text = `${n} tab${n === 1 ? "" : "s"} · ${dist} across ${activeSites} website${activeSites === 1 ? "" : "s"}`;
-    } else {
-      text = `${n} tab${n === 1 ? "" : "s"} split evenly across your websites`;
-    }
-  } else {
-    text = `${n} tab${n === 1 ? "" : "s"} on Website #1 first, then #2+ for missing items`;
+  elements.parallelTotalTitle.textContent = `Opens ${totalTabs} tab${totalTabs === 1 ? "" : "s"} total`;
+  let desc = `${t} product${t === 1 ? "" : "s"} at once on ${effectiveSites === 1 ? "1 website at a time" : `each of ${effectiveSites} websites`}.`;
+  if (siteCount > 0 && w > siteCount) {
+    desc += ` (You have ${siteCount} website${siteCount === 1 ? "" : "s"} added.)`;
   }
-  if (n >= 8) text += " · watch RAM & rate-limits";
-  elements.parallelSplitHint.textContent = text;
+  elements.parallelTotalDesc.textContent = desc;
 };
 
-const setConcurrentWorkers = (val, persist = true) => {
+const setParallelWebsites = (val, persist = true) => {
   const clean = Math.max(1, parseInt(val, 10) || 1);
-  elements.numConcurrentWorkers.value = String(clean);
-  elements.rangeConcurrentWorkers.value = String(Math.min(20, clean));
-  appSettings.concurrent_workers = clean;
+  elements.numParallelWebsites.value = String(clean);
+  elements.rangeParallelWebsites.value = String(Math.min(10, clean));
+  appSettings.parallel_websites = clean;
   updateParallelSplitHint();
   if (persist) saveCurrentSettings();
 };
 
-elements.rangeConcurrentWorkers.addEventListener("input", (e) => setConcurrentWorkers(e.target.value, true));
-elements.numConcurrentWorkers.addEventListener("change", (e) => setConcurrentWorkers(e.target.value, true));
-elements.selParallelMode.addEventListener("change", () => {
-  appSettings.parallel_mode = elements.selParallelMode.value;
+const setTabsPerWebsite = (val, persist = true) => {
+  const clean = Math.max(1, parseInt(val, 10) || 1);
+  elements.numTabsPerWebsite.value = String(clean);
+  elements.rangeTabsPerWebsite.value = String(Math.min(10, clean));
+  appSettings.tabs_per_website = clean;
   updateParallelSplitHint();
-  saveCurrentSettings();
-});
+  if (persist) saveCurrentSettings();
+};
+
+elements.rangeParallelWebsites.addEventListener("input", (e) => setParallelWebsites(e.target.value, true));
+elements.numParallelWebsites.addEventListener("change", (e) => setParallelWebsites(e.target.value, true));
+elements.rangeTabsPerWebsite.addEventListener("input", (e) => setTabsPerWebsite(e.target.value, true));
+elements.numTabsPerWebsite.addEventListener("change", (e) => setTabsPerWebsite(e.target.value, true));
 
 elements.rangeMaxImages.addEventListener("input", (e) => {
   const v = parseInt(e.target.value, 10);
@@ -1494,8 +1491,8 @@ const saveCurrentSettings = () => {
   appSettings.last_output_xlsx = elements.outputXlsxPath.value;
   appSettings.browser_mode = elements.selBrowserMode.value;
   appSettings.custom_browser_path = elements.customBrowserPath.value;
-  appSettings.parallel_mode = elements.selParallelMode.value;
-  appSettings.concurrent_workers = Math.max(1, parseInt(elements.numConcurrentWorkers.value, 10) || 3);
+  appSettings.parallel_websites = Math.max(1, parseInt(elements.numParallelWebsites.value, 10) || 1);
+  appSettings.tabs_per_website = Math.max(1, parseInt(elements.numTabsPerWebsite.value, 10) || 3);
   appSettings.block_trackers = elements.chkBlockTrackers.checked;
   appSettings.request_delay_sec = parseFloat(elements.rangeRequestDelay.value);
   appSettings.page_timeout_sec = parseInt(elements.rangePageTimeout.value, 10);
@@ -1586,8 +1583,8 @@ const loadSettingsIntoUI = (s) => {
   elements.valMaxImages.textContent = maxImgs === 0 ? "Unlimited" : `${maxImgs} max`;
   elements.txtCustomExcludes.value = s.custom_exclude_keywords || "";
 
-  elements.selParallelMode.value = s.parallel_mode || "products";
-  setConcurrentWorkers(s.concurrent_workers ?? 3, false);
+  setParallelWebsites(s.parallel_websites ?? 1, false);
+  setTabsPerWebsite(s.tabs_per_website ?? 3, false);
   elements.chkBlockTrackers.checked = s.block_trackers ?? true;
   const reqDelay = Number(s.request_delay_sec ?? 0.5);
   elements.rangeRequestDelay.value = reqDelay;
@@ -1631,28 +1628,36 @@ const refreshBrowserBadges = async () => {
   setBadge(elements.badgeBrave, Boolean(detected.brave));
 };
 
-// Resource Poller (updates sidebar mini meter + full gauges)
+// Resource Poller (updates always-visible sidebar CPU/RAM widget + full gauges)
 const pollResources = async () => {
   const res = await callApi("get_live_resources");
   if (!res) return;
 
-  elements.miniCpu.textContent = `${res.cpu_percent}%`;
-  elements.miniRam.textContent = `${res.memory_mb} MB`;
-  elements.miniRamBar.style.width = `${res.memory_percent_of_cap}%`;
-
   const cpuPct = Math.min(res.cpu_percent, 100);
+  const ramDisplay = res.memory_mb >= 1024
+    ? `${(res.memory_mb / 1024).toFixed(1)} GB`
+    : `${Math.round(res.memory_mb)} MB`;
+
+  elements.miniCpu.textContent = `${res.cpu_percent}%`;
+  if (elements.miniCpuBar) elements.miniCpuBar.style.width = `${cpuPct}%`;
+  elements.miniRam.textContent = ramDisplay;
+  elements.miniRamBar.style.width = `${res.memory_percent_of_cap}%`;
+  if (elements.miniRamFree && res.system_ram_free_gb > 0) {
+    elements.miniRamFree.textContent = `${res.system_ram_free_gb} GB free of ${res.system_ram_total_gb} GB`;
+  }
+
   elements.gaugeCpuText.textContent = `${res.cpu_percent}% (Cap: ${res.max_cpu_percent}%)`;
   elements.gaugeCpuBar.style.width = `${cpuPct}%`;
 
   elements.gaugeRamText.textContent = `${res.memory_mb} MB / ${res.max_ram_gb} GB`;
   elements.gaugeRamBar.style.width = `${res.memory_percent_of_cap}%`;
 
-  const barColor = res.memory_percent_of_cap > 85
-    ? "var(--danger)"
-    : (res.cpu_percent > res.max_cpu_percent ? "var(--warning)" : "var(--accent-primary)");
-  elements.miniRamBar.style.background = barColor;
-  elements.gaugeRamBar.style.background = res.memory_percent_of_cap > 85 ? "var(--danger)" : "var(--accent-primary)";
-  elements.gaugeCpuBar.style.background = res.cpu_percent > res.max_cpu_percent ? "var(--warning)" : "var(--accent-primary)";
+  const cpuColor = res.cpu_percent > res.max_cpu_percent ? "var(--warning)" : "var(--accent-primary)";
+  const ramColor = res.memory_percent_of_cap > 85 ? "var(--danger)" : "var(--accent-primary)";
+  if (elements.miniCpuBar) elements.miniCpuBar.style.background = cpuColor;
+  elements.miniRamBar.style.background = ramColor;
+  elements.gaugeRamBar.style.background = ramColor;
+  elements.gaugeCpuBar.style.background = cpuColor;
 };
 
 // Initialization
